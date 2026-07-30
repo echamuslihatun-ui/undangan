@@ -40,6 +40,10 @@ export async function PUT(req: Request) {
     const userId = (session.user as any).id;
     const { name, currentPassword, newPassword } = await req.json();
 
+    if ((currentPassword && !newPassword) || (!currentPassword && newPassword)) {
+      return NextResponse.json({ error: "Untuk mengganti password, isi password saat ini dan password baru" }, { status: 400 });
+    }
+
     const updateData: Record<string, unknown> = {};
 
     // Update name

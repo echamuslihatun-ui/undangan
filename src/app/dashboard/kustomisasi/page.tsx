@@ -86,51 +86,63 @@ export default function KustomisasiPage() {
     async function fetchData() {
       try {
         const [weddingRes, templatesRes] = await Promise.all([
-          fetch("/api/wedding"),
-          fetch("/api/templates"),
+          fetch("/api/wedding", { credentials: "same-origin" }),
+          fetch("/api/templates", { credentials: "same-origin" }),
         ]);
-        if (weddingRes.ok) {
-          const data = await weddingRes.json();
-          const bankAccounts = typeof data.bankAccounts === "string"
-            ? JSON.parse(data.bankAccounts || "[]")
-            : data.bankAccounts || [];
-          const photos = typeof data.photos === "string"
-            ? JSON.parse(data.photos || "[]")
-            : data.photos || [];
-          setWeddingData({
-            partner1: data.partner1 || "",
-            partner2: data.partner2 || "",
-            parent1: data.parent1 || "",
-            parent2: data.parent2 || "",
-            fatherPria: data.fatherPria || "",
-            motherPria: data.motherPria || "",
-            fatherWanita: data.fatherWanita || "",
-            motherWanita: data.motherWanita || "",
-            themeKey: data.themeKey || "classic",
-            akadDate: data.akadDate ? new Date(data.akadDate).toISOString().slice(0, 16) : "",
-            resepsiDate: data.resepsiDate ? new Date(data.resepsiDate).toISOString().slice(0, 16) : "",
-            location: data.location || "",
-            mapsUrl: data.mapsUrl || "",
-            message: data.message || "",
-            photos,
-            musicUrl: data.musicUrl || "",
-            bankName: data.bankName || "",
-            bankAccount: data.bankAccount || "",
-            bankHolder: data.bankHolder || "",
-            qrisImage: data.qrisImage || "",
-            bankAccounts,
-          });
+
+        if (!weddingRes.ok) {
+          const err = await weddingRes.json().catch(() => null);
+          console.error("Wedding fetch failed:", weddingRes.status, err);
+          throw new Error(err?.error || "Gagal mengambil data acara");
         }
-        if (templatesRes.ok) {
-          const data = await templatesRes.json();
-          setTemplates(data.filter((t: Template) => t.status === "active"));
+
+        if (!templatesRes.ok) {
+          const err = await templatesRes.json().catch(() => null);
+          console.error("Templates fetch failed:", templatesRes.status, err);
+          throw new Error(err?.error || "Gagal mengambil template");
         }
+
+        const weddingData = await weddingRes.json();
+        const bankAccounts = typeof weddingData.bankAccounts === "string"
+          ? JSON.parse(weddingData.bankAccounts || "[]")
+          : weddingData.bankAccounts || [];
+        const photos = typeof weddingData.photos === "string"
+          ? JSON.parse(weddingData.photos || "[]")
+          : weddingData.photos || [];
+
+        setWeddingData({
+          partner1: weddingData.partner1 || "",
+          partner2: weddingData.partner2 || "",
+          parent1: weddingData.parent1 || "",
+          parent2: weddingData.parent2 || "",
+          fatherPria: weddingData.fatherPria || "",
+          motherPria: weddingData.motherPria || "",
+          fatherWanita: weddingData.fatherWanita || "",
+          motherWanita: weddingData.motherWanita || "",
+          themeKey: weddingData.themeKey || "classic",
+          akadDate: weddingData.akadDate ? new Date(weddingData.akadDate).toISOString().slice(0, 16) : "",
+          resepsiDate: weddingData.resepsiDate ? new Date(weddingData.resepsiDate).toISOString().slice(0, 16) : "",
+          location: weddingData.location || "",
+          mapsUrl: weddingData.mapsUrl || "",
+          message: weddingData.message || "",
+          photos,
+          musicUrl: weddingData.musicUrl || "",
+          bankName: weddingData.bankName || "",
+          bankAccount: weddingData.bankAccount || "",
+          bankHolder: weddingData.bankHolder || "",
+          qrisImage: weddingData.qrisImage || "",
+          bankAccounts,
+        });
+
+        const templatesData = await templatesRes.json();
+        setTemplates(templatesData.filter((t: Template) => t.status === "active"));
       } catch (error) {
         console.error("Failed to fetch data:", error);
       } finally {
         setLoading(false);
       }
     }
+
     fetchData();
   }, []);
 
@@ -152,6 +164,7 @@ export default function KustomisasiPage() {
     try {
       const res = await fetch("/api/wedding", {
         method: "PUT",
+        credentials: "same-origin",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(weddingData),
       });

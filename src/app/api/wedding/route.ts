@@ -12,7 +12,12 @@ export async function GET() {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const userId = (session.user as any).id;
+    const userId = (session.user as any)?.id;
+    if (!userId) {
+      console.error("Wedding fetch error: missing userId in session", session);
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     const wedding = await prisma.wedding.findUnique({
       where: { userId },
       include: { guests: true },
@@ -21,7 +26,8 @@ export async function GET() {
     return NextResponse.json(wedding);
   } catch (error) {
     console.error("Wedding fetch error:", error);
-    return NextResponse.json({ error: "Gagal mengambil data" }, { status: 500 });
+    const message = error instanceof Error ? error.message : "Gagal mengambil data";
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }
 
@@ -32,7 +38,12 @@ export async function PUT(req: Request) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const userId = (session.user as any).id;
+    const userId = (session.user as any)?.id;
+    if (!userId) {
+      console.error("Wedding update error: missing userId in session", session);
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     const body = await req.json();
     const allowedData: Record<string, unknown> = {
       partner1: body.partner1,
@@ -66,9 +77,19 @@ export async function PUT(req: Request) {
       (allowedData as any).slug = `${baseSlug}-${randomCode}`;
     }
 
-    const wedding = await prisma.wedding.update({
+    const randomCode = Math.random().toString(36).substring(2, 6);
+    const createData = {
+      userId,
+      partner1: body.partner1 || "Pasangan",
+      partner2: body.partner2 || "Undangan",
+      slug: (allowedData as any).slug ?? `undangan-${randomCode}`,
+      ...allowedData,
+    };
+
+    const wedding = await prisma.wedding.upsert({
       where: { userId },
-      data: allowedData,
+      update: allowedData,
+      create: createData,
     });
 
     return NextResponse.json(wedding);

@@ -44,6 +44,12 @@ export default function ProfilPage() {
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    if ((currentPassword && !newPassword) || (!currentPassword && newPassword)) {
+      showToast("error", "Untuk ganti password, isi Password Saat Ini dan Password Baru");
+      return;
+    }
+
     setSaving(true);
 
     try {

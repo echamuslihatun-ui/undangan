@@ -316,8 +316,8 @@ export default function AdminTemplatePage() {
 
       {/* Edit Modal */}
       {editTemplate && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <div className="w-full max-w-md rounded-xl bg-white p-6 shadow-xl">
+        <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-black/50 px-4 py-6 no-scrollbar">
+          <div className="w-full max-w-md rounded-xl bg-white p-6 shadow-xl max-h-[calc(100vh-3rem)] overflow-y-auto no-scrollbar">
             <div className="mb-4 flex items-center justify-between">
               <h2 className="font-semibold">Edit Template</h2>
               <button onClick={() => setEditTemplate(null)}><X className="h-5 w-5 text-muted-foreground" /></button>
@@ -347,7 +347,7 @@ export default function AdminTemplatePage() {
               <div>
                 <label className="mb-1.5 block text-sm font-medium">Upload Gambar Baru</label>
                 <div
-                  className={`group mt-2 flex min-h-[170px] flex-col items-center justify-center gap-2 rounded-xl border border-dashed bg-slate-50 px-4 py-6 text-center transition ${editDragActive ? "border-blue-500 bg-blue-50" : "border-border hover:border-primary"}`}
+                  className={`relative group mt-2 flex min-h-[170px] flex-col items-center justify-center gap-2 rounded-xl border border-dashed bg-slate-50 px-4 py-6 text-center transition ${editDragActive ? "border-blue-500 bg-blue-50" : "border-border hover:border-primary"}`}
                   onDragOver={(e) => handleDragOver(e, setEditDragActive)}
                   onDragLeave={(e) => handleDragLeave(e, setEditDragActive)}
                   onDrop={(e) => handleDrop(e, setEditDragActive, handleEditImageChange)}
@@ -423,7 +423,7 @@ export default function AdminTemplatePage() {
             <div>
               <label className="mb-1.5 block text-sm font-medium">Upload Gambar Template</label>
               <div
-                className={`group mt-2 flex min-h-[170px] flex-col items-center justify-center gap-2 rounded-xl border border-dashed bg-slate-50 px-4 py-6 text-center transition ${newDragActive ? "border-blue-500 bg-blue-50" : "border-border hover:border-primary"}`}
+                className={`relative group mt-2 flex min-h-[170px] flex-col items-center justify-center gap-2 rounded-xl border border-dashed bg-slate-50 px-4 py-6 text-center transition ${newDragActive ? "border-blue-500 bg-blue-50" : "border-border hover:border-primary"}`}
                 onDragOver={(e) => handleDragOver(e, setNewDragActive)}
                 onDragLeave={(e) => handleDragLeave(e, setNewDragActive)}
                 onDrop={(e) => handleDrop(e, setNewDragActive, handleNewImageChange)}
