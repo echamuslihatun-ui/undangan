@@ -12,7 +12,7 @@ export async function GET() {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const userId = (session.user as any).id;
+    const userId = session.user.id;
     const wedding = await prisma.wedding.findUnique({
       where: { userId },
     });
@@ -40,7 +40,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const userId = (session.user as any).id;
+    const userId = session.user.id;
     const { name, email, phone, attendanceStatus, numberOfGuests, message } = await req.json();
 
     if (!name || !phone) {

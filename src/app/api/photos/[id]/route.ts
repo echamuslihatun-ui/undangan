@@ -10,7 +10,7 @@ export async function DELETE(req: Request, { params }: { params: { id: string } 
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const userId = (session.user as any).id;
+    const userId = session.user.id;
     const photo = await prisma.photo.findFirst({
       where: { id: params.id, wedding: { userId } },
     });

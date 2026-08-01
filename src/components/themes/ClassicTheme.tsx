@@ -6,31 +6,10 @@ import { motion, useScroll, useTransform } from "framer-motion";
 import type { Variants } from "framer-motion";
 import { Heart, Calendar, MapPin, Clock } from "lucide-react";
 import CountdownTimer from "@/components/CountdownTimer";
-
-type WeddingData = {
-  partner1: string;
-  partner2: string;
-  parent1?: string | null;
-  parent2?: string | null;
-  fatherPria?: string | null;
-  motherPria?: string | null;
-  fatherWanita?: string | null;
-  motherWanita?: string | null;
-  akadDate?: string | null;
-  resepsiDate?: string | null;
-  location?: string | null;
-  mapsUrl?: string | null;
-  message?: string | null;
-  photos?: string[] | null;
-  musicUrl?: string | null;
-  bankName?: string | null;
-  bankAccount?: string | null;
-  bankHolder?: string | null;
-  bankAccounts?: Array<{ bank: string; account: string; holder: string }> | null;
-  qrisImage?: string | null;
-};
+import type { WeddingData } from "./types";
 
 const fadeUp: Variants = {
+
   hidden: { opacity: 0, y: 40 },
   visible: { opacity: 1, y: 0, transition: { duration: 0.7, ease: [0.25, 0.1, 0.25, 1] } },
 };

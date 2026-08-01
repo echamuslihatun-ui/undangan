@@ -121,10 +121,15 @@ export default function TamuPage() {
     }
   };
 
-  const handleCopyLink = (guest: Guest) => {
-    // Use new personalized link format: /rsvp?wedding-slug=guest-slug
+    // Format link tamu: /public/weddings/<slug>?to=<guestSlug>
+  const buildGuestLink = (guest: Guest) => {
     const weddingSlug = wedding?.slug || "";
-    const link = `${window.location.origin}/rsvp?${weddingSlug}=${guest.slug}`;
+    return `${window.location.origin}/public/weddings/${encodeURIComponent(weddingSlug)}?to=${encodeURIComponent(guest.slug)}`;
+  };
+
+
+  const handleCopyLink = (guest: Guest) => {
+    const link = buildGuestLink(guest);
     navigator.clipboard.writeText(link).then(() => {
       setCopiedId(guest.id);
       setTimeout(() => setCopiedId(null), 2000);
@@ -136,9 +141,7 @@ export default function TamuPage() {
       showToast("error", "Kirim undangan akan aktif setelah pembayaran berhasil.");
       return;
     }
-    // Use new personalized link format: /rsvp?wedding-slug=guest-slug
-    const weddingSlug = wedding?.slug || "";
-    const link = `${window.location.origin}/rsvp?${weddingSlug}=${guest.slug}`;
+    const link = buildGuestLink(guest);
     const dateText = wedding?.resepsiDate ? new Date(wedding.resepsiDate).toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" }) : "Tanggal menyusul";
     const text = `Kepada Yth.\n${guest.name}\n\nDengan memohon rahmat Allah SWT, kami mengundang untuk menghadiri acara pernikahan kami:\n\n${wedding?.partner1 || "Mempelai"} & ${wedding?.partner2 || "Pasangan"}\n${dateText}\n${wedding?.location || "Lokasi menyusul"}\n\nLink undangan: ${link}\n\nMerupakan suatu kehormatan bagi kami atas kehadiran dan doa restu Anda.`;
     window.open(`https://wa.me/${guest.phone}?text=${encodeURIComponent(text)}`, "_blank");
@@ -207,12 +210,11 @@ export default function TamuPage() {
 
   // EXPORT EXCEL
   const handleExport = () => {
-    const weddingSlug = wedding?.slug || "";
     const exportData = guests.map((g) => ({
       Nama: g.name,
       "No. WhatsApp": g.phone,
       Status: g.status === "confirmed" ? "Konfirmasi" : g.status === "sent" ? "Terkirim" : "Pending",
-      Link: `${window.location.origin}/rsvp?${weddingSlug}=${g.slug}`,
+      Link: buildGuestLink(g),
     }));
 
     const ws = XLSX.utils.json_to_sheet(exportData);
@@ -315,7 +317,8 @@ export default function TamuPage() {
                   <td className="px-4 py-3 text-muted-foreground">{guest.phone}</td>
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-2">
-                      <span className="truncate text-xs text-primary">/rsvp?{wedding?.slug}={guest.slug}</span>
+                      <span className="truncate text-xs text-primary">/public/weddings/{wedding?.slug}?to={guest.slug}</span>
+
                       <button onClick={() => handleCopyLink(guest)} className="text-muted-foreground hover:text-primary" title="Salin link">
                         {copiedId === guest.id ? <CheckCircle className="h-3 w-3 text-green-600" /> : <Copy className="h-3 w-3" />}
                       </button>

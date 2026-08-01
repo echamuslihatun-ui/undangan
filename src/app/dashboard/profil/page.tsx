@@ -1,9 +1,16 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { User, Mail, Calendar, Lock, Save, Eye, EyeOff } from "lucide-react";
+import Image from "next/image";
+import Link from "next/link";
+import { User, Mail, Lock, Save, Eye, EyeOff, Crown, Clock } from "lucide-react";
 import { useToast } from "@/components/Toast";
-import { formatDate } from "@/lib/utils";
+
+interface Subscription {
+  packageName: string; // Free | Basic | Premium | Exclusive
+  activeUntil: string | null;
+  daysRemaining: number | null;
+}
 
 interface Profile {
   id: string;
@@ -12,7 +19,17 @@ interface Profile {
   image: string | null;
   role: string;
   createdAt: string;
+  subscription?: Subscription;
 }
+
+// Warna badge per paket.
+const PACKAGE_STYLES: Record<string, string> = {
+  Free: "bg-gray-100 text-gray-700 border-gray-200",
+  Basic: "bg-blue-100 text-blue-700 border-blue-200",
+  Premium: "bg-purple-100 text-purple-700 border-purple-200",
+  Exclusive: "bg-amber-100 text-amber-700 border-amber-200",
+};
+
 
 export default function ProfilPage() {
   const [profile, setProfile] = useState<Profile | null>(null);
@@ -95,21 +112,96 @@ export default function ProfilPage() {
       </div>
 
       <div className="grid gap-6 lg:grid-cols-3">
-        <div className="lg:col-span-1">
+        <div className="lg:col-span-1 space-y-6">
           <div className="card-custom text-center">
-            <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-primary/10">
-              <User className="h-10 w-10 text-primary" />
-            </div>
+            {profile?.image ? (
+              <Image
+                src={profile.image}
+                alt={profile.name || "Foto profil"}
+                width={80}
+                height={80}
+                className="mx-auto h-20 w-20 rounded-full object-cover"
+              />
+            ) : (
+              <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-primary/10">
+                <User className="h-10 w-10 text-primary" />
+              </div>
+            )}
             <h2 className="mt-4 font-serif text-xl font-bold">{profile?.name}</h2>
             <p className="text-sm text-muted-foreground">{profile?.email}</p>
-            <div className="mt-4 flex justify-center gap-2">
+            <div className="mt-4 flex flex-wrap justify-center gap-2">
               <span className="badge-muted">{profile?.role === "admin" ? "Admin" : "Pelanggan"}</span>
               {profile?.createdAt && (
                 <span className="badge-muted">Bergabung {new Date(profile.createdAt).toLocaleDateString("id-ID", { month: "short", year: "numeric" })}</span>
               )}
             </div>
           </div>
+
+          {/* Status Paket Langganan */}
+          <div className="card-custom">
+            <h2 className="flex items-center gap-2 font-semibold">
+              <Crown className="h-5 w-5 text-primary" /> Paket Langganan
+            </h2>
+
+            {(() => {
+              const sub = profile?.subscription;
+              const pkg = sub?.packageName ?? "Free";
+              const badgeStyle = PACKAGE_STYLES[pkg] ?? PACKAGE_STYLES.Free;
+              const isFree = pkg === "Free";
+
+              return (
+                <div className="mt-4 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-muted-foreground">Paket saat ini</span>
+                    <span className={`rounded-full border px-3 py-1 text-sm font-semibold ${badgeStyle}`}>
+                      {pkg}
+                    </span>
+                  </div>
+
+                  {isFree ? (
+                    <>
+                      <p className="text-sm text-muted-foreground">
+                        Anda menggunakan paket gratis. Tingkatkan ke paket berbayar untuk
+                        mengaktifkan undangan Anda.
+                      </p>
+                      <Link href="/dashboard/pembayaran" className="btn-primary w-full justify-center">
+                        Upgrade Paket
+                      </Link>
+                    </>
+                  ) : (
+                    <>
+                      {sub?.activeUntil && (
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm text-muted-foreground">Aktif hingga</span>
+                          <span className="text-sm font-medium">
+                            {new Date(sub.activeUntil).toLocaleDateString("id-ID", {
+                              day: "numeric",
+                              month: "long",
+                              year: "numeric",
+                            })}
+                          </span>
+                        </div>
+                      )}
+                      {typeof sub?.daysRemaining === "number" && (
+                        <div className="flex items-center gap-2 rounded-lg bg-primary/5 p-3 text-sm">
+                          <Clock className="h-4 w-4 text-primary" />
+                          <span>
+                            Berakhir dalam{" "}
+                            <span className="font-semibold text-primary">
+                              {sub.daysRemaining} hari
+                            </span>{" "}
+                            lagi
+                          </span>
+                        </div>
+                      )}
+                    </>
+                  )}
+                </div>
+              );
+            })()}
+          </div>
         </div>
+
 
         <div className="lg:col-span-2">
           <form onSubmit={handleSave} className="card-custom space-y-6">

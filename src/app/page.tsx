@@ -25,7 +25,6 @@ interface Template {
   id: string;
   name: string;
   category: string;
-  price: number;
   image: string;
 }
 
@@ -192,7 +191,6 @@ export default function Home() {
                   <div className="p-4">
                     <div className="flex items-center justify-between">
                       <h3 className="font-semibold">{tpl.name}</h3>
-                      <span className="text-sm font-bold text-primary">{formatCurrency(tpl.price)}</span>
                     </div>
                     <div className="mt-3 grid gap-2">
                       <button type="button" onClick={() => setPreviewTemplate(tpl)} className="btn-secondary w-full">Preview</button>
@@ -315,7 +313,6 @@ export default function Home() {
                 <div className="space-y-4 rounded-3xl bg-muted p-4">
                   <div>
                     <h3 className="text-xl font-semibold">{previewTemplate.name}</h3>
-                    <p className="mt-2 text-sm text-muted-foreground">Harga: {formatCurrency(previewTemplate.price)}</p>
                   </div>
                   <p className="text-sm text-muted-foreground">Template ini dapat dipilih saat mendaftar. Preview yang ditampilkan adalah contoh desain, termasuk tata letak dan gaya teks.</p>
                   <a href={`/register?templateId=${previewTemplate.id}`} className="btn-primary w-full">Pilih Template Ini</a>

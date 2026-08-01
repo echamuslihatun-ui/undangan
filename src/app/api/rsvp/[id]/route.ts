@@ -10,7 +10,7 @@ export async function PUT(req: Request, { params }: { params: { id: string } }) 
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const userId = (session.user as any).id;
+    const userId = session.user.id;
     const { attendanceStatus } = await req.json();
 
     const existing = await prisma.rSVP.findFirst({
@@ -40,7 +40,7 @@ export async function DELETE(req: Request, { params }: { params: { id: string } 
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const userId = (session.user as any).id;
+    const userId = session.user.id;
     const existing = await prisma.rSVP.findFirst({
       where: { id: params.id, wedding: { userId } },
     });

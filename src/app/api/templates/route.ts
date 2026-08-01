@@ -25,11 +25,11 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const { name, category, price, image, features, themeKey } = await req.json();
+    const { name, category, image, features, themeKey } = await req.json();
 
-    if (!name || !price) {
+    if (!name) {
       return NextResponse.json(
-        { error: "Nama dan harga harus diisi" },
+        { error: "Nama template harus diisi" },
         { status: 400 }
       );
     }
@@ -38,7 +38,6 @@ export async function POST(req: Request) {
       data: {
         name,
         category: category || "Classic",
-        price: parseInt(price),
         image: image || "https://images.unsplash.com/photo-1519225421980-715cb0215aed?w=400",
         features: JSON.stringify(features || []),
         themeKey: themeKey || "classic",

@@ -9,7 +9,7 @@ export async function GET(req: Request, { params }: { params: { id: string } }) 
     const session = await getServerSession(authOptions);
 
     if (session) {
-      const userId = (session.user as any).id;
+      const userId = session.user.id;
       const guest = await prisma.guest.findFirst({
         where: {
           OR: [{ id: idOrSlug }, { slug: idOrSlug }],
@@ -24,15 +24,31 @@ export async function GET(req: Request, { params }: { params: { id: string } }) 
       return NextResponse.json(guest);
     }
 
+    // Akses publik: verifikasi tamu benar-benar milik undangan yang dibuka
+    // (bila `weddingId`/`weddingSlug` disertakan) agar slug tamu dari undangan
+    // lain tidak bisa dipakai membuka undangan ini.
+    const url = new URL(req.url);
+    const weddingId = url.searchParams.get("weddingId");
+    const weddingSlug = url.searchParams.get("weddingSlug");
+
     const guest = await prisma.guest.findFirst({
       where: { slug: idOrSlug },
+      include: { wedding: { select: { id: true, slug: true } } },
     });
 
     if (!guest) {
       return NextResponse.json({ error: "Tamu tidak ditemukan" }, { status: 404 });
     }
 
-    return NextResponse.json({ name: guest.name, phone: guest.phone });
+    if (
+      (weddingId && guest.wedding.id !== weddingId) ||
+      (weddingSlug && guest.wedding.slug !== weddingSlug)
+    ) {
+      return NextResponse.json({ error: "Tamu tidak ditemukan" }, { status: 404 });
+    }
+
+    return NextResponse.json({ id: guest.id, name: guest.name, phone: guest.phone });
+
   } catch (error) {
     console.error("Guest fetch error:", error);
     return NextResponse.json({ error: "Gagal mengambil data tamu" }, { status: 500 });
@@ -46,7 +62,7 @@ export async function DELETE(req: Request, { params }: { params: { id: string } 
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const userId = (session.user as any).id;
+    const userId = session.user.id;
     const wedding = await prisma.wedding.findUnique({
       where: { userId },
     });

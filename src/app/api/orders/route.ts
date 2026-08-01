@@ -2,6 +2,9 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
+import { createSnapTransaction, SNAP_TOKEN_TTL_HOURS } from "@/lib/midtrans";
+import { getPackage } from "@/lib/packages";
+
 
 export const dynamic = "force-dynamic";
 
@@ -12,7 +15,7 @@ export async function GET() {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const userId = (session.user as any).id;
+    const userId = session.user.id;
     const orders = await prisma.order.findMany({
       where: { userId },
       include: { template: true },
@@ -33,8 +36,15 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const userId = (session.user as any).id;
-    const { templateId, packageName, amount, method } = await req.json();
+    const userId = session.user.id;
+    const { templateId, packageName, method } = await req.json();
+
+    // Harga TIDAK diambil dari client. Nilai `amount` dari body diabaikan
+    // supaya tidak bisa dimanipulasi (mis. mengirim amount: 1). Harga dan masa
+    // aktif ditentukan server berdasarkan paket yang dipilih.
+    const selectedPackage = getPackage(packageName);
+    const grossAmount = selectedPackage.price;
+
     const template = templateId
       ? await prisma.template.findUnique({ where: { id: templateId } })
       : await prisma.template.findFirst({ where: { status: "active" }, orderBy: { createdAt: "desc" } });
@@ -47,14 +57,51 @@ export async function POST(req: Request) {
       data: {
         userId,
         templateId: template.id,
-        packageName: packageName || "Premium",
-        amount: parseInt(String(amount)),
+        packageName: selectedPackage.name,
+        amount: grossAmount,
         method,
       },
       include: { template: true },
     });
 
-    return NextResponse.json(order, { status: 201 });
+    // Buat transaksi Snap. order.id dipakai sebagai order_id agar cocok
+    // dengan webhook yang mencari order via `where: { id: order_id }`.
+    try {
+      const snap = await createSnapTransaction({
+        orderId: order.id,
+        grossAmount: order.amount,
+        itemName: `${order.packageName} - ${template.name}`,
+        method,
+        customerName: session.user?.name ?? null,
+        customerEmail: session.user?.email ?? null,
+      });
+
+      // Simpan token & redirect URL supaya order pending bisa dilanjutkan nanti
+      // (user dapat melihat kembali nomor VA / QR tanpa membuat pesanan baru).
+      const snapExpiresAt = new Date(Date.now() + SNAP_TOKEN_TTL_HOURS * 60 * 60 * 1000);
+      const updated = await prisma.order.update({
+        where: { id: order.id },
+        data: {
+          snapToken: snap.token,
+          snapRedirectUrl: snap.redirectUrl,
+          snapExpiresAt,
+        },
+        include: { template: true },
+      });
+
+      return NextResponse.json({ ...updated, redirectUrl: snap.redirectUrl }, { status: 201 });
+
+    } catch (snapError) {
+      // Order tetap tersimpan sebagai pending agar bisa dilanjutkan/ditelusuri.
+      console.error("Snap transaction error:", snapError);
+      return NextResponse.json(
+        {
+          error: "Pesanan dibuat, tetapi gagal memulai pembayaran. Coba lagi beberapa saat.",
+          orderId: order.id,
+        },
+        { status: 502 }
+      );
+    }
   } catch (error) {
     console.error("Order create error:", error);
     return NextResponse.json({ error: "Gagal membuat pesanan" }, { status: 500 });

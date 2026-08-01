@@ -65,7 +65,6 @@ model Template {
   id        String   @id @default(cuid())
   name      String
   category  String
-  price     Int
   image     String
   status    String   @default("active") // active | inactive
   features  String @default("[]")
@@ -81,6 +80,8 @@ model Wedding {
   userId          String   @unique
   partner1        String
   partner2        String
+  nickname1       String?
+  nickname2       String?
   parent1         String?
   parent2         String?
   fatherPria      String?
@@ -124,15 +125,18 @@ model Guest {
   createdAt DateTime @default(now())
 
   wedding Wedding @relation(fields: [weddingId], references: [id], onDelete: Cascade)
+  rsvp    RSVP?
 
   @@index([weddingId])
   @@index([slug])
 }
 
+
 model RSVP {
   id               String   @id @default(cuid())
   weddingId        String
   userId           String
+  guestId          String?  @unique // Satu tamu hanya boleh 1 RSVP
   name             String
   email            String?
   phone            String
@@ -144,10 +148,12 @@ model RSVP {
 
   wedding Wedding @relation(fields: [weddingId], references: [id], onDelete: Cascade)
   user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  guest   Guest?  @relation(fields: [guestId], references: [id], onDelete: Cascade)
 
   @@index([weddingId])
   @@index([userId])
 }
+
 
 model Message {
   id          String   @id @default(cuid())
@@ -184,8 +190,13 @@ model Order {
   amount      Int
   method      String?  // qris | transfer | ewallet
   status      String   @default("pending") // pending | success | failed
+  // Data Snap disimpan agar order pending bisa dilanjutkan (lihat nomor VA/QR lagi).
+  snapToken       String?
+  snapRedirectUrl String?
+  snapExpiresAt   DateTime? // Snap token berlaku 24 jam sejak dibuat
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+
 
   user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   template Template @relation(fields: [templateId], references: [id], onDelete: Cascade)

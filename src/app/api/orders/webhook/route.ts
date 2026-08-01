@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { verifyMidtransNotification } from "@/lib/midtrans";
+import { verifyMidtransNotification, mapMidtransStatusToOrderStatus } from "@/lib/midtrans";
+import { markOrderPaid, markOrderFailed } from "@/lib/orders";
 
 export async function POST(req: Request) {
   try {
@@ -9,50 +10,42 @@ export async function POST(req: Request) {
     // Verifikasi signature Midtrans untuk keamanan
     const isValid = verifyMidtransNotification(body);
     if (!isValid) {
-      console.error("Midtrans webhook signature tidak valid:", body);
+      console.error("Midtrans webhook signature tidak valid:", body?.order_id);
       return NextResponse.json({ error: "Invalid signature" }, { status: 401 });
     }
 
-    const { order_id, transaction_status, payment_type } = body;
+    const { order_id, transaction_status, payment_type, fraud_status, gross_amount } = body;
 
-    if (transaction_status === "capture" || transaction_status === "settlement") {
-      await prisma.order.updateMany({
-        where: { id: order_id },
-        data: {
-          status: "success",
-          method: payment_type || "qris",
-        },
-      });
+    const mapped = mapMidtransStatusToOrderStatus(transaction_status, fraud_status);
 
-      const order = await prisma.order.findUnique({
-        where: { id: order_id },
-        include: { user: { include: { wedding: true } } },
-      });
-
-      if (order?.user?.wedding) {
-        const activeUntil = new Date();
-        activeUntil.setMonth(activeUntil.getMonth() + 6);
-
-        await prisma.wedding.update({
-          where: { id: order.user.wedding.id },
-          data: {
-            status: "active",
-            activeUntil,
-          },
-        });
+    if (mapped === "success") {
+      // Lapisan pertahanan tambahan: cocokkan jumlah pembayaran dengan order di DB
+      // agar order tidak diaktifkan bila nominalnya tidak sesuai.
+      const order = await prisma.order.findUnique({ where: { id: order_id } });
+      if (!order) {
+        console.error("Webhook: order tidak ditemukan:", order_id);
+        return NextResponse.json({ message: "Order not found" });
       }
 
+      // Midtrans mengirim gross_amount sebagai string desimal, mis. "250000.00".
+      const paidAmount = Math.round(parseFloat(String(gross_amount)));
+      if (Number.isFinite(paidAmount) && paidAmount !== order.amount) {
+        console.error(
+          `Webhook: gross_amount (${paidAmount}) tidak sama dengan order.amount (${order.amount}) untuk ${order_id}`
+        );
+        return NextResponse.json({ error: "Amount mismatch" }, { status: 400 });
+      }
+
+      await markOrderPaid(order_id, payment_type);
       return NextResponse.json({ message: "Webhook processed: order activated" });
     }
 
-    if (transaction_status === "deny" || transaction_status === "expire") {
-      await prisma.order.updateMany({
-        where: { id: order_id },
-        data: { status: "failed" },
-      });
+    if (mapped === "failed") {
+      await markOrderFailed(order_id);
       return NextResponse.json({ message: "Webhook processed: order failed" });
     }
 
+    // pending / challenge: belum ada perubahan status yang perlu disimpan
     return NextResponse.json({ message: "Webhook received" });
   } catch (error) {
     console.error("Webhook error:", error);

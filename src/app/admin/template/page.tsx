@@ -3,13 +3,13 @@
 import { useState, useEffect } from "react";
 import Image from "next/image";
 import { Plus, Edit, Trash2, Search, Upload, X, CheckCircle, AlertCircle } from "lucide-react";
-import { formatCurrency } from "@/lib/utils";
+import { THEMES } from "@/components/themes/registry";
+
 
 type Template = {
   id: string;
   name: string;
   category: string;
-  price: number;
   status: string;
   image: string;
   themeKey: string;
@@ -27,7 +27,6 @@ export default function AdminTemplatePage() {
   const [showAdd, setShowAdd] = useState(false);
   const [newName, setNewName] = useState("");
   const [newCategory, setNewCategory] = useState("");
-  const [newPrice, setNewPrice] = useState("");
   const [newThemeKey, setNewThemeKey] = useState("classic");
   const [newImageFile, setNewImageFile] = useState<File | null>(null);
   const [newImagePreview, setNewImagePreview] = useState("");
@@ -36,7 +35,6 @@ export default function AdminTemplatePage() {
   const [editTemplate, setEditTemplate] = useState<Template | null>(null);
   const [editName, setEditName] = useState("");
   const [editCategory, setEditCategory] = useState("");
-  const [editPrice, setEditPrice] = useState("");
   const [editThemeKey, setEditThemeKey] = useState("classic");
   const [editImageFile, setEditImageFile] = useState<File | null>(null);
   const [editImagePreview, setEditImagePreview] = useState("");
@@ -78,7 +76,7 @@ export default function AdminTemplatePage() {
 
   const handleAdd = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newName || !newPrice) return;
+    if (!newName) return;
     try {
       const imageUrl = newImageFile ? await uploadImage(newImageFile) : undefined;
       const res = await fetch("/api/templates", {
@@ -87,7 +85,6 @@ export default function AdminTemplatePage() {
         body: JSON.stringify({
           name: newName,
           category: newCategory || "Classic",
-          price: parseInt(newPrice),
           themeKey: newThemeKey,
           image: imageUrl,
         }),
@@ -97,7 +94,6 @@ export default function AdminTemplatePage() {
         setTemplates([...templates, template]);
         setNewName("");
         setNewCategory("");
-        setNewPrice("");
         setNewThemeKey("classic");
         setNewImageFile(null);
         setNewImagePreview("");
@@ -132,7 +128,6 @@ export default function AdminTemplatePage() {
     setEditTemplate(tpl);
     setEditName(tpl.name);
     setEditCategory(tpl.category);
-    setEditPrice(String(tpl.price));
     setEditThemeKey(tpl.themeKey || "classic");
     setEditImageFile(null);
     setEditImagePreview(tpl.image);
@@ -221,7 +216,6 @@ export default function AdminTemplatePage() {
       const body: Record<string, unknown> = {
         name: editName,
         category: editCategory,
-        price: parseInt(editPrice),
         themeKey: editThemeKey,
       };
       if (imageUrl) body.image = imageUrl;
@@ -334,15 +328,13 @@ export default function AdminTemplatePage() {
                 </select>
               </div>
               <div>
-                <label className="mb-1.5 block text-sm font-medium">Harga (IDR)</label>
-                <input type="number" value={editPrice} onChange={(e) => setEditPrice(e.target.value)} className="input-custom" required />
-              </div>
-              <div>
                 <label className="mb-1.5 block text-sm font-medium">Tema</label>
                 <select value={editThemeKey} onChange={(e) => setEditThemeKey(e.target.value)} className="input-custom">
-                  <option value="classic">Classic</option>
-                  <option value="modern">Modern</option>
+                  {THEMES.map((t) => (
+                    <option key={t.key} value={t.key}>{t.label}</option>
+                  ))}
                 </select>
+
               </div>
               <div>
                 <label className="mb-1.5 block text-sm font-medium">Upload Gambar Baru</label>
@@ -366,7 +358,11 @@ export default function AdminTemplatePage() {
                 {editImagePreview ? (
                   <div className="mt-3 overflow-hidden rounded-xl border border-border bg-slate-50 p-3">
                     <p className="text-xs text-muted-foreground mb-2">Preview gambar</p>
-                    <img src={editImagePreview} alt="Preview template" className="h-48 w-full rounded-lg object-cover" />
+                    <div className="relative h-48 w-full overflow-hidden rounded-lg">
+                      {/* Sumber gambar berupa data URL hasil pilih file lokal,
+                          jadi optimasi Next Image dilewati (unoptimized). */}
+                      <Image src={editImagePreview} alt="Preview template" fill unoptimized className="object-cover" />
+                    </div>
                   </div>
                 ) : (
                   <div className="mt-3 rounded-xl border border-dashed border-border bg-slate-50 p-3 text-sm text-muted-foreground">
@@ -385,8 +381,8 @@ export default function AdminTemplatePage() {
 
       <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="font-serif text-2xl font-bold md:text-3xl">Template & Price List</h1>
-          <p className="mt-1 text-muted-foreground">Kelola template undangan dan harga paket.</p>
+          <h1 className="font-serif text-2xl font-bold md:text-3xl">Template Undangan</h1>
+          <p className="mt-1 text-muted-foreground">Kelola koleksi template undangan.</p>
         </div>
         <button onClick={() => setShowAdd(!showAdd)} className="btn-primary"><Plus className="h-4 w-4" /> Tambah Template</button>
       </div>
@@ -397,7 +393,7 @@ export default function AdminTemplatePage() {
             <h2 className="font-semibold">Tambah Template Baru</h2>
             <button onClick={() => setShowAdd(false)}><X className="h-5 w-5 text-muted-foreground" /></button>
           </div>
-          <form onSubmit={handleAdd} className="grid gap-4 sm:grid-cols-4">
+          <form onSubmit={handleAdd} className="grid gap-4 sm:grid-cols-3">
             <div>
               <label className="mb-1.5 block text-sm font-medium">Nama Template</label>
               <input type="text" value={newName} onChange={(e) => setNewName(e.target.value)} className="input-custom" placeholder="Nama template" required />
@@ -410,15 +406,13 @@ export default function AdminTemplatePage() {
               </select>
             </div>
             <div>
-              <label className="mb-1.5 block text-sm font-medium">Harga (IDR)</label>
-              <input type="number" value={newPrice} onChange={(e) => setNewPrice(e.target.value)} className="input-custom" placeholder="150000" required />
-            </div>
-            <div>
               <label className="mb-1.5 block text-sm font-medium">Tema</label>
               <select value={newThemeKey} onChange={(e) => setNewThemeKey(e.target.value)} className="input-custom">
-                <option value="classic">Classic</option>
-                <option value="modern">Modern</option>
+                {THEMES.map((t) => (
+                  <option key={t.key} value={t.key}>{t.label}</option>
+                ))}
               </select>
+
             </div>
             <div>
               <label className="mb-1.5 block text-sm font-medium">Upload Gambar Template</label>
@@ -442,7 +436,11 @@ export default function AdminTemplatePage() {
               {newImagePreview ? (
                 <div className="mt-3 overflow-hidden rounded-xl border border-border bg-slate-50 p-3">
                   <p className="text-xs text-muted-foreground mb-2">Preview gambar</p>
-                  <img src={newImagePreview} alt="Preview template" className="h-48 w-full rounded-lg object-cover" />
+                  <div className="relative h-48 w-full overflow-hidden rounded-lg">
+                    {/* Sumber gambar berupa data URL hasil pilih file lokal,
+                        jadi optimasi Next Image dilewati (unoptimized). */}
+                    <Image src={newImagePreview} alt="Preview template" fill unoptimized className="object-cover" />
+                  </div>
                 </div>
               ) : (
                 <div className="mt-3 rounded-xl border border-dashed border-border bg-slate-50 p-3 text-sm text-muted-foreground">
@@ -450,7 +448,7 @@ export default function AdminTemplatePage() {
                 </div>
               )}
             </div>
-            <div className="flex items-end sm:col-span-4">
+            <div className="flex items-end sm:col-span-3">
               <button type="submit" className="btn-primary"><Upload className="h-4 w-4" /> Simpan</button>
             </div>
           </form>
@@ -479,7 +477,6 @@ export default function AdminTemplatePage() {
             <div className="p-4">
               <div className="flex items-center justify-between">
                 <h3 className="font-semibold">{tpl.name}</h3>
-                <span className="font-bold text-primary">{formatCurrency(tpl.price)}</span>
               </div>
               <p className="mt-1 text-xs text-muted-foreground capitalize">Tema: {tpl.themeKey}</p>
               <div className="mt-3 flex gap-2">

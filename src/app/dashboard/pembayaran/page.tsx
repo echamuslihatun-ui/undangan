@@ -1,8 +1,9 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { CreditCard, QrCode, Wallet, Landmark, CheckCircle, Clock, Copy } from "lucide-react";
+import { useState, useEffect, useCallback, useRef } from "react";
+import { CreditCard, QrCode, Wallet, Landmark, CheckCircle, Clock, RefreshCw, ExternalLink, XCircle, Package } from "lucide-react";
 import { formatCurrency, formatDateTime } from "@/lib/utils";
+import { PACKAGE_LIST, DEFAULT_PACKAGE, type PackageName } from "@/lib/packages";
 
 type Method = "qris" | "transfer" | "ewallet";
 
@@ -12,59 +13,147 @@ type Transaction = {
   method: string;
   status: string;
   createdAt: string;
+  snapRedirectUrl?: string | null;
+  snapExpiresAt?: string | null;
+};
+
+const METHOD_LABELS: Record<string, string> = {
+  qris: "QRIS",
+  transfer: "Bank Transfer",
+  ewallet: "E-Wallet",
 };
 
 export default function PembayaranPage() {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
   const [method, setMethod] = useState<Method>("qris");
-  const [copied, setCopied] = useState<string | null>(null);
+  const [selectedPackage, setSelectedPackage] = useState<PackageName>(DEFAULT_PACKAGE);
   const [paying, setPaying] = useState(false);
+  const [checkingId, setCheckingId] = useState<string | null>(null);
+  const [cancelingId, setCancelingId] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+  const autoSyncedRef = useRef(false);
 
-  useEffect(() => {
-    async function fetchOrders() {
-      try {
-        const res = await fetch("/api/orders");
-        if (res.ok) {
-          const data = await res.json();
-          setTransactions(data);
-        }
-      } catch (error) {
-        console.error("Failed to fetch orders:", error);
-      } finally {
-        setLoading(false);
+  const fetchOrders = useCallback(async () => {
+    try {
+      const res = await fetch("/api/orders");
+      if (res.ok) {
+        const data = await res.json();
+        setTransactions(data);
       }
+    } catch (error) {
+      console.error("Failed to fetch orders:", error);
+    } finally {
+      setLoading(false);
     }
-    fetchOrders();
   }, []);
 
-  const handleCopy = (text: string, label: string) => {
-    navigator.clipboard.writeText(text).then(() => {
-      setCopied(label);
-      setTimeout(() => setCopied(null), 2000);
-    });
-  };
+  useEffect(() => {
+    fetchOrders();
+  }, [fetchOrders]);
+
+  // Sinkronisasi otomatis satu kali saat kembali dari halaman pembayaran Midtrans.
+  // Menutup kasus status masih "pending" karena webhook belum masuk (mis. dev lokal).
+  useEffect(() => {
+    if (loading || autoSyncedRef.current) return;
+    const pending = transactions.find((trx) => trx.status === "pending");
+    if (!pending) return;
+    autoSyncedRef.current = true;
+    (async () => {
+      try {
+        const res = await fetch(`/api/orders/${pending.id}/status`);
+        if (!res.ok) return;
+        const data = await res.json();
+        if (data.order?.status === "success") {
+          setNotice("Pembayaran terkonfirmasi. Undangan Anda sudah aktif.");
+        }
+        await fetchOrders();
+      } catch {
+        // Diamkan; user tetap bisa menekan "Cek Status" secara manual.
+      }
+    })();
+  }, [loading, transactions, fetchOrders]);
 
   const handleBayar = async () => {
     setPaying(true);
+    setNotice(null);
     try {
       const res = await fetch("/api/orders", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ packageName: "Premium", amount: 250000, method }),
+        body: JSON.stringify({ packageName: selectedPackage, method }),
       });
+      const data = await res.json();
       if (!res.ok) {
-        const data = await res.json();
-        alert(data.error || "Gagal membuat pesanan");
+        setNotice(data.error || "Gagal membuat pesanan");
         return;
       }
-      const order = await res.json();
-      setTransactions([order, ...transactions]);
-      alert("Pesanan berhasil dibuat. Silakan selesaikan pembayaran melalui metode yang dipilih.");
+      if (!data.redirectUrl) {
+        setNotice("Pesanan dibuat, tetapi halaman pembayaran tidak tersedia.");
+        return;
+      }
+      // Arahkan ke halaman pembayaran Midtrans Snap.
+      window.location.href = data.redirectUrl;
     } catch (error) {
-      alert("Gagal membuat pesanan");
+      setNotice("Gagal membuat pesanan");
     } finally {
       setPaying(false);
+    }
+  };
+
+  /** Tanya status ke Midtrans; berguna bila notifikasi webhook belum masuk. */
+  const handleCekStatus = async (id: string) => {
+    setCheckingId(id);
+    setNotice(null);
+    try {
+      const res = await fetch(`/api/orders/${id}/status`);
+      const data = await res.json();
+      if (!res.ok) {
+        setNotice(data.error || "Gagal memeriksa status pembayaran");
+        return;
+      }
+
+      const status = data.order?.status;
+      if (status === "success") {
+        setNotice("Pembayaran terkonfirmasi. Undangan Anda sudah aktif.");
+      } else if (status === "failed") {
+        setNotice("Pembayaran dibatalkan atau kedaluwarsa. Silakan buat pesanan baru.");
+      } else if (!data.midtrans?.transactionStatus) {
+        setNotice("Belum ada pembayaran yang tercatat untuk pesanan ini.");
+      } else {
+        setNotice(`Status di Midtrans masih "${data.midtrans.transactionStatus}". Selesaikan pembayaran lalu cek kembali.`);
+      }
+
+      await fetchOrders();
+    } catch (error) {
+      setNotice("Gagal memeriksa status pembayaran");
+    } finally {
+      setCheckingId(null);
+    }
+  };
+
+  /**
+   * Batalkan pesanan pending agar user bisa memilih metode lain.
+   * Nomor VA terikat pada satu order di Midtrans, jadi metode tidak bisa
+   * ditukar pada pesanan yang sama.
+   */
+  const handleGantiMetode = async (id: string) => {
+    if (!confirm("Batalkan pesanan ini dan pilih metode pembayaran lain?")) return;
+    setCancelingId(id);
+    setNotice(null);
+    try {
+      const res = await fetch(`/api/orders/${id}/cancel`, { method: "POST" });
+      const data = await res.json();
+      if (!res.ok) {
+        setNotice(data.error || "Gagal membatalkan pesanan");
+        return;
+      }
+      setNotice("Pesanan dibatalkan. Pilih metode pembayaran lalu tekan Bayar Sekarang.");
+      await fetchOrders();
+    } catch (error) {
+      setNotice("Gagal membatalkan pesanan");
+    } finally {
+      setCancelingId(null);
     }
   };
 
@@ -73,6 +162,14 @@ export default function PembayaranPage() {
     { id: "transfer" as Method, label: "Bank Transfer", icon: Landmark, desc: "BCA, BNI, Mandiri, BRI" },
     { id: "ewallet" as Method, label: "E-Wallet", icon: Wallet, desc: "GoPay, OVO, DANA, ShopeePay" },
   ];
+
+  const activeOrder = transactions.find((trx) => trx.status === "success");
+  const pendingOrder = transactions.find((trx) => trx.status === "pending");
+  const currentPackage =
+    PACKAGE_LIST.find((pkg) => pkg.name === selectedPackage) ?? PACKAGE_LIST[0];
+
+  const isSnapExpired = (trx: Transaction) =>
+    !trx.snapRedirectUrl || (trx.snapExpiresAt ? new Date(trx.snapExpiresAt) < new Date() : false);
 
   if (loading) {
     return <div className="text-center py-12">Loading...</div>;
@@ -85,23 +182,80 @@ export default function PembayaranPage() {
         <p className="mt-1 text-muted-foreground">Pilih metode pembayaran untuk mengaktifkan undangan.</p>
       </div>
 
-      <div className="mb-6 card-custom border-green-200 bg-green-50">
-        <div className="flex items-center gap-3">
-          <CheckCircle className="h-6 w-6 text-green-600" />
-          <div>
-            <p className="font-semibold text-green-800">Pembayaran Terverifikasi</p>
-            <p className="text-sm text-green-700">Undangan Anda aktif hingga 24 Februari 2027.</p>
+      {notice && (
+        <div role="status" aria-live="polite" className="mb-6 card-custom border-primary/30 bg-primary/5">
+          <div className="flex items-start justify-between gap-3">
+            <p className="text-sm">{notice}</p>
+            <button onClick={() => setNotice(null)} aria-label="Tutup pemberitahuan" className="text-muted-foreground hover:text-foreground">
+              <XCircle className="h-4 w-4" />
+            </button>
           </div>
         </div>
-      </div>
+      )}
+
+      {activeOrder && (
+        <div className="mb-6 card-custom border-green-200 bg-green-50">
+          <div className="flex items-center gap-3">
+            <CheckCircle className="h-6 w-6 text-green-600" />
+            <div>
+              <p className="font-semibold text-green-800">Pembayaran Terverifikasi</p>
+              <p className="text-sm text-green-700">
+                Pembayaran {formatCurrency(activeOrder.amount)} pada {formatDateTime(activeOrder.createdAt)} telah dikonfirmasi.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {!activeOrder && pendingOrder && (
+        <div className="mb-6 card-custom border-amber-200 bg-amber-50">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-center gap-3">
+              <Clock className="h-6 w-6 shrink-0 text-amber-600" />
+              <div>
+                <p className="font-semibold text-amber-800">Menunggu Pembayaran</p>
+                <p className="text-sm text-amber-700">
+                  Pesanan {formatCurrency(pendingOrder.amount)} via {METHOD_LABELS[pendingOrder.method] || pendingOrder.method} dibuat {formatDateTime(pendingOrder.createdAt)}.
+                  {isSnapExpired(pendingOrder)
+                    ? " Halaman pembayaran sudah kedaluwarsa."
+                    : " Lanjutkan untuk melihat kembali nomor VA / QR Anda."}
+                </p>
+              </div>
+            </div>
+            {!isSnapExpired(pendingOrder) && (
+              <a href={pendingOrder.snapRedirectUrl!} className="btn-primary shrink-0 text-center">
+                <ExternalLink className="mr-1 inline h-4 w-4" /> Lanjutkan Pembayaran
+              </a>
+            )}
+          </div>
+        </div>
+      )}
 
       <div className="grid gap-6 lg:grid-cols-3">
-        <div className="lg:col-span-2">
+        <div className="lg:col-span-2 space-y-6">
+          <div className="card-custom">
+            <h2 className="mb-4 flex items-center gap-2 font-semibold"><Package className="h-5 w-5 text-primary" /> Pilih Paket</h2>
+            <div className="grid gap-3 sm:grid-cols-3">
+              {PACKAGE_LIST.map((pkg) => (
+                <button
+                  key={pkg.name}
+                  onClick={() => setSelectedPackage(pkg.name)}
+                  aria-pressed={selectedPackage === pkg.name}
+                  className={`rounded-lg border p-4 text-left transition ${selectedPackage === pkg.name ? "border-primary bg-primary/5" : "border-border hover:bg-muted"}`}
+                >
+                  <p className="font-semibold">{pkg.name}</p>
+                  <p className="mt-1 text-sm font-bold text-primary">{formatCurrency(pkg.price)}</p>
+                  <p className="mt-1 text-xs text-muted-foreground">Aktif {pkg.activeMonths} bulan</p>
+                </button>
+              ))}
+            </div>
+          </div>
+
           <div className="card-custom">
             <h2 className="mb-4 flex items-center gap-2 font-semibold"><CreditCard className="h-5 w-5 text-primary" /> Pilih Metode Pembayaran</h2>
             <div className="space-y-3">
               {methods.map((m) => (
-                <button key={m.id} onClick={() => setMethod(m.id)} className={`flex w-full items-center gap-4 rounded-lg border p-4 text-left transition ${method === m.id ? "border-primary bg-primary/5" : "border-border hover:bg-muted"}`}>
+                <button key={m.id} onClick={() => setMethod(m.id)} aria-pressed={method === m.id} className={`flex w-full items-center gap-4 rounded-lg border p-4 text-left transition ${method === m.id ? "border-primary bg-primary/5" : "border-border hover:bg-muted"}`}>
                   <div className={`flex h-10 w-10 items-center justify-center rounded-full ${method === m.id ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"}`}>
                     <m.icon className="h-5 w-5" />
                   </div>
@@ -116,47 +270,15 @@ export default function PembayaranPage() {
               ))}
             </div>
 
-            <div className="mt-6 rounded-lg bg-muted/50 p-4">
+            <div className="mt-6 rounded-lg bg-muted/50 p-4 text-sm text-muted-foreground">
               {method === "qris" && (
-                <div className="text-center">
-                  <div className="mx-auto flex h-48 w-48 items-center justify-center rounded-lg bg-white p-4 shadow-sm">
-                    <QrCode className="h-32 w-32 text-foreground" />
-                  </div>
-                  <p className="mt-3 text-sm text-muted-foreground">Scan QRIS menggunakan e-wallet atau mobile banking</p>
-                </div>
+                <p>QRIS akan ditampilkan di halaman pembayaran setelah Anda menekan Bayar Sekarang. Scan dengan e-wallet atau mobile banking.</p>
               )}
               {method === "transfer" && (
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between rounded-lg bg-white p-3">
-                    <div>
-                      <p className="text-xs text-muted-foreground">Bank BCA</p>
-                      <p className="font-bold">1234567890</p>
-                      <p className="text-xs text-muted-foreground">a.n. PT Undanganku</p>
-                    </div>
-                    <button onClick={() => handleCopy("1234567890", "bca")} className="btn-secondary text-xs">
-                      {copied === "bca" ? <CheckCircle className="h-3 w-3" /> : <Copy className="h-3 w-3" />} {copied === "bca" ? "Tersalin" : "Salin"}
-                    </button>
-                  </div>
-                  <div className="flex items-center justify-between rounded-lg bg-white p-3">
-                    <div>
-                      <p className="text-xs text-muted-foreground">Bank Mandiri</p>
-                      <p className="font-bold">9876543210</p>
-                      <p className="text-xs text-muted-foreground">a.n. PT Undanganku</p>
-                    </div>
-                    <button onClick={() => handleCopy("9876543210", "mandiri")} className="btn-secondary text-xs">
-                      {copied === "mandiri" ? <CheckCircle className="h-3 w-3" /> : <Copy className="h-3 w-3" />} {copied === "mandiri" ? "Tersalin" : "Salin"}
-                    </button>
-                  </div>
-                </div>
+                <p>Nomor Virtual Account akan diterbitkan otomatis di halaman pembayaran setelah Anda menekan Bayar Sekarang.</p>
               )}
               {method === "ewallet" && (
-                <div className="grid grid-cols-2 gap-3">
-                  {["GoPay", "OVO", "DANA", "ShopeePay"].map((w) => (
-                    <button key={w} onClick={() => alert(`Pembayaran via ${w} akan segera tersedia.`)} className="flex items-center justify-center gap-2 rounded-lg bg-white p-3 font-semibold hover:bg-muted">
-                      <Wallet className="h-4 w-4 text-primary" /> {w}
-                    </button>
-                  ))}
-                </div>
+                <p>Anda akan diarahkan ke aplikasi e-wallet pilihan setelah menekan Bayar Sekarang.</p>
               )}
             </div>
           </div>
@@ -168,24 +290,24 @@ export default function PembayaranPage() {
             <div className="space-y-3 text-sm">
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Paket</span>
-                <span className="font-medium">Premium</span>
+                <span className="font-medium">{currentPackage.name}</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-muted-foreground">Template</span>
-                <span className="font-medium">Elegant Rose</span>
+                <span className="text-muted-foreground">Metode</span>
+                <span className="font-medium">{METHOD_LABELS[method]}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Masa Aktif</span>
-                <span className="font-medium">6 bulan</span>
+                <span className="font-medium">{currentPackage.activeMonths} bulan</span>
               </div>
               <div className="border-t border-border pt-3">
                 <div className="flex justify-between">
                   <span className="font-semibold">Total</span>
-                  <span className="font-bold text-primary">{formatCurrency(250000)}</span>
+                  <span className="font-bold text-primary">{formatCurrency(currentPackage.price)}</span>
                 </div>
               </div>
             </div>
-            <button onClick={handleBayar} disabled={paying} className="btn-primary mt-4 w-full">{paying ? "Memproses..." : "Bayar Sekarang"}</button>
+            <button onClick={handleBayar} disabled={paying} className="btn-primary mt-4 w-full">{paying ? "Mengalihkan ke pembayaran..." : "Bayar Sekarang"}</button>
             <p className="mt-3 text-center text-xs text-muted-foreground">Verifikasi otomatis via webhook setelah pembayaran.</p>
           </div>
         </div>
@@ -205,6 +327,7 @@ export default function PembayaranPage() {
                   <th className="px-4 py-3 text-left font-semibold">Metode</th>
                   <th className="px-4 py-3 text-left font-semibold">Jumlah</th>
                   <th className="px-4 py-3 text-left font-semibold">Status</th>
+                  <th className="px-4 py-3 text-left font-semibold">Aksi</th>
                 </tr>
               </thead>
               <tbody>
@@ -212,10 +335,43 @@ export default function PembayaranPage() {
                   <tr key={trx.id} className="border-b border-border last:border-0">
                     <td className="px-4 py-3 font-medium">{trx.id}</td>
                     <td className="px-4 py-3 text-muted-foreground">{formatDateTime(trx.createdAt)}</td>
-                    <td className="px-4 py-3">{trx.method}</td>
+                    <td className="px-4 py-3">{METHOD_LABELS[trx.method] || trx.method}</td>
                     <td className="px-4 py-3 font-medium">{formatCurrency(trx.amount)}</td>
                     <td className="px-4 py-3">
                       {trx.status === "success" ? <span className="badge-success">Berhasil</span> : trx.status === "pending" ? <span className="badge-warning"><Clock className="mr-1 inline h-3 w-3" /> Pending</span> : <span className="badge-danger">Gagal</span>}
+                    </td>
+                    <td className="px-4 py-3">
+                      {trx.status === "pending" ? (
+                        <div className="flex flex-wrap items-center gap-2">
+                          {isSnapExpired(trx) ? (
+                            <span className="text-xs text-muted-foreground">Halaman pembayaran kedaluwarsa</span>
+                          ) : (
+                            <a
+                              href={trx.snapRedirectUrl!}
+                              className="inline-flex items-center gap-1 rounded-md border border-primary px-2 py-1 text-xs font-medium text-primary hover:bg-primary/5"
+                            >
+                              <ExternalLink className="h-3 w-3" /> Lanjutkan
+                            </a>
+                          )}
+                          <button
+                            onClick={() => handleCekStatus(trx.id)}
+                            disabled={checkingId === trx.id}
+                            className="inline-flex items-center gap-1 rounded-md border border-border px-2 py-1 text-xs font-medium hover:bg-muted disabled:opacity-50"
+                          >
+                            <RefreshCw className={`h-3 w-3 ${checkingId === trx.id ? "animate-spin" : ""}`} />
+                            {checkingId === trx.id ? "Memeriksa..." : "Cek Status"}
+                          </button>
+                          <button
+                            onClick={() => handleGantiMetode(trx.id)}
+                            disabled={cancelingId === trx.id}
+                            className="inline-flex items-center gap-1 rounded-md border border-border px-2 py-1 text-xs font-medium text-muted-foreground hover:bg-muted disabled:opacity-50"
+                          >
+                            {cancelingId === trx.id ? "Membatalkan..." : "Ganti Metode"}
+                          </button>
+                        </div>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">-</span>
+                      )}
                     </td>
                   </tr>
                 ))}

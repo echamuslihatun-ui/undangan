@@ -16,6 +16,8 @@ interface BankAccount {
 interface WeddingData {
   partner1: string;
   partner2: string;
+  nickname1: string;
+  nickname2: string;
   parent1: string;
   parent2: string;
   fatherPria: string;
@@ -41,7 +43,6 @@ interface Template {
   id: string;
   name: string;
   category: string;
-  price: number;
   image: string;
   themeKey: string;
   status: string;
@@ -55,6 +56,8 @@ export default function KustomisasiPage() {
   const [weddingData, setWeddingData] = useState<WeddingData>({
     partner1: "",
     partner2: "",
+    nickname1: "",
+    nickname2: "",
     parent1: "",
     parent2: "",
     fatherPria: "",
@@ -113,6 +116,8 @@ export default function KustomisasiPage() {
         setWeddingData({
           partner1: weddingData.partner1 || "",
           partner2: weddingData.partner2 || "",
+          nickname1: weddingData.nickname1 || "",
+          nickname2: weddingData.nickname2 || "",
           parent1: weddingData.parent1 || "",
           parent2: weddingData.parent2 || "",
           fatherPria: weddingData.fatherPria || "",
@@ -154,10 +159,28 @@ export default function KustomisasiPage() {
   ];
 
   const handleSelectTemplate = async (template: Template) => {
-    setWeddingData({ ...weddingData, themeKey: template.themeKey });
-    showToast("success", `Template "${template.name}" dipilih!`);
+    const updated = { ...weddingData, themeKey: template.themeKey };
+    setWeddingData(updated);
+    // Simpan pilihan template langsung agar tersimpan tanpa perlu klik Simpan di tab lain
+    try {
+      const res = await fetch("/api/wedding", {
+        method: "PUT",
+        credentials: "same-origin",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(updated),
+      });
+      if (res.ok) {
+        showToast("success", `Template "${template.name}" dipilih & disimpan!`);
+      } else {
+        showToast("error", `Template "${template.name}" dipilih, tapi gagal disimpan. Klik Simpan.`);
+      }
+    } catch (error) {
+      console.error("Save template error:", error);
+      showToast("error", `Template "${template.name}" dipilih, tapi gagal disimpan. Klik Simpan.`);
+    }
     setActiveTab("acara");
   };
+
 
   const handleSave = async () => {
     setSaving(true);
@@ -307,7 +330,6 @@ export default function KustomisasiPage() {
                 <div className="p-4">
                   <h3 className="font-semibold">{template.name}</h3>
                   <p className="mt-1 text-sm text-muted-foreground">{template.category}</p>
-                  <p className="mt-2 font-bold text-primary">Rp {template.price.toLocaleString("id-ID")}</p>
                   <div className="mt-3 flex gap-2">
                     <button onClick={() => setPreviewTemplate(template)} className="btn-secondary flex-1 text-xs">
                       <Eye className="h-3 w-3" /> Preview
@@ -340,6 +362,20 @@ export default function KustomisasiPage() {
               <div className="relative">
                 <User className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                 <input type="text" value={weddingData.partner2} onChange={(e) => setWeddingData({ ...weddingData, partner2: e.target.value })} className="input-custom pl-10" placeholder="Nama lengkap" />
+              </div>
+            </div>
+            <div>
+              <label className="mb-1.5 block text-sm font-medium">Nama Panggilan Pria</label>
+              <div className="relative">
+                <User className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <input type="text" value={weddingData.nickname1} onChange={(e) => setWeddingData({ ...weddingData, nickname1: e.target.value })} className="input-custom pl-10" placeholder="Nama panggilan (untuk cover & link)" />
+              </div>
+            </div>
+            <div>
+              <label className="mb-1.5 block text-sm font-medium">Nama Panggilan Wanita</label>
+              <div className="relative">
+                <User className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <input type="text" value={weddingData.nickname2} onChange={(e) => setWeddingData({ ...weddingData, nickname2: e.target.value })} className="input-custom pl-10" placeholder="Nama panggilan (untuk cover & link)" />
               </div>
             </div>
             <div>
