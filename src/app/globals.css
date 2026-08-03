@@ -71,4 +71,41 @@
     width: 0;
     height: 0;
   }
+
+  /* ===== Elegant theme utilities ===== */
+  .font-display {
+    font-family: var(--font-great-vibes), cursive;
+  }
+  .font-serif-display {
+    font-family: var(--font-cormorant), serif;
+  }
+  .font-playfair {
+    font-family: var(--font-playfair), serif;
+  }
+  .ornament-line {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.75rem;
+  }
+  .ornament-line::before,
+  .ornament-line::after {
+    content: "";
+    height: 1px;
+    width: 3rem;
+    background: linear-gradient(90deg, transparent, #c9a96e, transparent);
+  }
+}
+
+@layer utilities {
+  .text-shadow-lg {
+    text-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+  }
+  .text-shadow-sm {
+    text-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+  }
+  .bg-grain {
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3' /%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.03' /%3E%3C/svg%3E");
+  }
 }

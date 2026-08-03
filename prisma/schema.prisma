@@ -94,6 +94,11 @@ model Wedding {
   location        String?
   mapsUrl         String?
   message         String?
+  quote           String?
+  instagram1      String?
+  instagram2      String?
+  storyEnabled    Boolean @default(false)
+  story           String  @default("[]")
   photos          String @default("[]")
   musicUrl        String?
   bankName        String?

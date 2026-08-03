@@ -12,6 +12,7 @@
 import type { ComponentType } from "react";
 import ClassicTheme from "./ClassicTheme";
 import ModernTheme from "./ModernTheme";
+import ElegantTheme from "./ElegantTheme";
 import type { ThemeComponentProps } from "./types";
 
 export type ThemeEntry = {
@@ -26,6 +27,7 @@ export type ThemeEntry = {
 export const THEMES: ThemeEntry[] = [
   { key: "classic", label: "Classic", component: ClassicTheme },
   { key: "modern", label: "Modern", component: ModernTheme },
+  { key: "elegant", label: "Elegant", component: ElegantTheme },
 ];
 
 /** Peta cepat key → entri, untuk lookup di renderer. */

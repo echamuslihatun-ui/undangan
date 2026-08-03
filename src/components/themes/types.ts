@@ -4,6 +4,7 @@
  * sehingga cukup satu tempat bila ada penambahan/perubahan field.
  */
 export type BankAccount = { bank: string; account: string; holder: string };
+export type StoryItem = { date: string; title: string; description: string };
 
 export type WeddingData = {
   partner1: string;
@@ -21,6 +22,12 @@ export type WeddingData = {
   location?: string | null;
   mapsUrl?: string | null;
   message?: string | null;
+  quote?: string | null;
+  instagram1?: string | null;
+  instagram2?: string | null;
+  storyEnabled?: boolean | null;
+  // `story` bisa datang sebagai array atau string JSON dari DB.
+  story?: StoryItem[] | string | null;
   // `photos` & `bankAccounts` bisa datang sebagai array atau string JSON dari DB;
   // theme bertanggung jawab menormalkannya (lihat ClassicTheme sebagai contoh).
   photos?: string[] | string | null;
