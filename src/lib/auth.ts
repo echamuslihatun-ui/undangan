@@ -3,7 +3,12 @@ import GoogleProvider from "next-auth/providers/google";
 import CredentialsProvider from "next-auth/providers/credentials";
 import { PrismaAdapter } from "@auth/prisma-adapter";
 import { prisma } from "@/lib/prisma";
+import { logger } from "@/lib/logger";
 import bcrypt from "bcryptjs";
+
+// Pesan generik untuk klien. Alasan kegagalan yang sebenarnya hanya masuk log
+// server, supaya tidak membocorkan email mana yang terdaftar.
+const GENERIC_AUTH_ERROR = "Email atau password salah";
 
 export const authOptions: NextAuthOptions = {
   adapter: PrismaAdapter(prisma) as NextAuthOptions["adapter"],
@@ -30,23 +35,50 @@ export const authOptions: NextAuthOptions = {
           throw new Error("Email dan password diperlukan");
         }
 
-        const user = await prisma.user.findUnique({
-          where: { email: credentials.email },
-        }) as any;
+        let user: any;
+        try {
+          user = await prisma.user.findUnique({
+            where: { email: credentials.email },
+          });
+        } catch (error) {
+          // Query gagal (skema belum di-push, pooler bermasalah, kredensial salah).
+          // Tanpa log ini, kegagalan database tampak identik dengan password salah.
+          logger.error("Login gagal: query database error", error, {
+            email: credentials.email,
+          });
+          throw new Error(GENERIC_AUTH_ERROR);
+        }
 
-        if (!user || !user.password) {
-          throw new Error("Email atau password salah");
+        if (!user) {
+          logger.warn("Login gagal: user tidak ditemukan", {
+            email: credentials.email,
+          });
+          throw new Error(GENERIC_AUTH_ERROR);
+        }
+
+        if (!user.password) {
+          // Akun dibuat via Google OAuth, jadi tidak punya password.
+          logger.warn("Login gagal: akun tanpa password (kemungkinan OAuth)", {
+            email: credentials.email,
+          });
+          throw new Error(GENERIC_AUTH_ERROR);
         }
 
         const isValid = await bcrypt.compare(credentials.password, user.password);
 
         if (!isValid) {
-          throw new Error("Email atau password salah");
+          logger.warn("Login gagal: password tidak cocok", {
+            email: credentials.email,
+          });
+          throw new Error(GENERIC_AUTH_ERROR);
         }
 
         if (user.status === "suspended") {
+          logger.warn("Login gagal: akun disuspend", { email: credentials.email });
           throw new Error("Akun Anda sedang disuspend");
         }
+
+        logger.info("Login berhasil", { email: user.email, role: user.role });
 
         return {
           id: user.id,
