@@ -89,12 +89,36 @@ model Wedding {
   motherPria      String?
   fatherWanita    String?
   motherWanita    String?
+  // ===== Acara: Akad =====
+  // Tanggal disimpan sebagai DateTime (nama hari diturunkan otomatis darinya),
+  // sedangkan jam sebagai string "HH:mm" karena butuh jam mulai & selesai
+  // sekaligus menghindari pergeseran timezone.
   akadDate        DateTime?
+  akadStart       String?
+  akadEnd         String?
+  akadVenue       String?
+  akadMapsUrl     String?
+
+  // ===== Acara: Resepsi =====
   resepsiDate     DateTime?
+  resepsiStart    String?
+  resepsiEnd      String?
+  resepsiVenue    String?
+  resepsiMapsUrl  String?
+
+  // Lokasi umum (legacy) — dipakai theme sebagai fallback bila venue
+  // per-acara belum diisi, agar data lama tidak hilang.
   location        String?
   mapsUrl         String?
   message         String?
   quote           String?
+  quoteSource     String? // mis. "QS. Ar-Rum: 21"
+
+  // ===== Media =====
+  heroImage       String? // background section hero
+  quoteImage      String? // background section kutipan ayat
+  photoPria       String? // foto mempelai pria
+  photoWanita     String? // foto mempelai wanita
   instagram1      String?
   instagram2      String?
   storyEnabled    Boolean @default(false)

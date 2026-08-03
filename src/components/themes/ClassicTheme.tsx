@@ -19,6 +19,24 @@ const fadeIn: Variants = {
   visible: { opacity: 1, transition: { duration: 0.8 } },
 };
 
+const COVER_FALLBACK =
+  "https://images.unsplash.com/photo-1519225421980-715cb0215aed?w=800";
+
+/** Label jam acara dari jam mulai/selesai yang kini tersimpan terpisah. */
+function eventTimeLabel(start?: string | null, end?: string | null) {
+  if (start && end) return `${start} - ${end} WIB`;
+  if (start) return `${start} WIB`;
+  return null;
+}
+
+function dateLabel(value: string) {
+  return new Date(value).toLocaleDateString("id-ID", {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  });
+}
+
 export default function ClassicTheme({ wedding }: { wedding: WeddingData }) {
   const eventDate = wedding.resepsiDate || wedding.akadDate;
   const photos = Array.isArray(wedding.photos) ? wedding.photos : (wedding.photos ? JSON.parse(wedding.photos) : []);
@@ -26,6 +44,15 @@ export default function ClassicTheme({ wedding }: { wedding: WeddingData }) {
   const { scrollY } = useScroll();
   const yParallax = useTransform(scrollY, [0, 600], [0, -150]);
   const audioRef = useRef<HTMLAudioElement>(null);
+  // Cover mengikuti pengaturan dashboard; galeri lalu gambar contoh sebagai cadangan.
+  const coverImage = wedding.heroImage || photos[0] || COVER_FALLBACK;
+  const akadTime = eventTimeLabel(wedding.akadStart, wedding.akadEnd);
+  const resepsiTime = eventTimeLabel(wedding.resepsiStart, wedding.resepsiEnd);
+  const akadVenue = wedding.akadVenue || wedding.location;
+  const resepsiVenue = wedding.resepsiVenue || wedding.location;
+  // Lokasi umum hanya ditampilkan bila tiap acara belum punya tempat sendiri.
+  const showGeneralLocation =
+    !!wedding.location && !wedding.akadVenue && !wedding.resepsiVenue;
 
   useEffect(() => {
     if (wedding.musicUrl && audioRef.current) {
@@ -40,7 +67,7 @@ export default function ClassicTheme({ wedding }: { wedding: WeddingData }) {
       {/* Cover dengan Parallax Effect */}
       <motion.div style={{ y: yParallax }} className="relative aspect-[3/4] overflow-hidden">
         <Image
-          src="https://images.unsplash.com/photo-1519225421980-715cb0215aed?w=800"
+          src={coverImage}
           alt="Cover"
           fill
           priority
@@ -182,13 +209,20 @@ export default function ClassicTheme({ wedding }: { wedding: WeddingData }) {
               className="rounded-lg bg-white p-4 text-center shadow-sm border border-[#e8d9c0] cursor-pointer"
             >
               <h4 className="font-semibold text-[#5c4a32]">Akad Nikah</h4>
-              <div className="mt-2 flex items-center justify-center gap-2 text-sm text-[#8b7355]">
-                <Clock className="h-4 w-4" /> 08:00 - 10:00 WIB
-              </div>
+              {akadTime && (
+                <div className="mt-2 flex items-center justify-center gap-2 text-sm text-[#8b7355]">
+                  <Clock className="h-4 w-4" /> {akadTime}
+                </div>
+              )}
               <div className="mt-1 flex items-center justify-center gap-2 text-sm text-[#8b7355]">
                 <Calendar className="h-4 w-4" />
-                {new Date(wedding.akadDate).toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" })}
+                {dateLabel(wedding.akadDate)}
               </div>
+              {akadVenue && (
+                <div className="mt-1 flex items-center justify-center gap-2 text-sm text-[#8b7355]">
+                  <MapPin className="h-4 w-4 shrink-0" /> {akadVenue}
+                </div>
+              )}
             </motion.div>
           )}
           {wedding.resepsiDate && (
@@ -200,17 +234,24 @@ export default function ClassicTheme({ wedding }: { wedding: WeddingData }) {
               className="rounded-lg bg-white p-4 text-center shadow-sm border border-[#e8d9c0] cursor-pointer"
             >
               <h4 className="font-semibold text-[#5c4a32]">Resepsi</h4>
-              <div className="mt-2 flex items-center justify-center gap-2 text-sm text-[#8b7355]">
-                <Clock className="h-4 w-4" /> 11:00 - 14:00 WIB
-              </div>
+              {resepsiTime && (
+                <div className="mt-2 flex items-center justify-center gap-2 text-sm text-[#8b7355]">
+                  <Clock className="h-4 w-4" /> {resepsiTime}
+                </div>
+              )}
               <div className="mt-1 flex items-center justify-center gap-2 text-sm text-[#8b7355]">
                 <Calendar className="h-4 w-4" />
-                {new Date(wedding.resepsiDate).toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" })}
+                {dateLabel(wedding.resepsiDate)}
               </div>
+              {resepsiVenue && (
+                <div className="mt-1 flex items-center justify-center gap-2 text-sm text-[#8b7355]">
+                  <MapPin className="h-4 w-4 shrink-0" /> {resepsiVenue}
+                </div>
+              )}
             </motion.div>
           )}
         </div>
-        {wedding.location && (
+        {showGeneralLocation && (
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}

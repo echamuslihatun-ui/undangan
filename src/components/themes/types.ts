@@ -4,7 +4,25 @@
  * sehingga cukup satu tempat bila ada penambahan/perubahan field.
  */
 export type BankAccount = { bank: string; account: string; holder: string };
-export type StoryItem = { date: string; title: string; description: string };
+
+/**
+ * Satu item timeline "Cerita Cinta".
+ * `month` + `year` adalah format baru (mis. "Januari" / "2023").
+ * `date` dipertahankan sebagai fallback untuk data lama yang sudah tersimpan.
+ */
+export type StoryItem = {
+  month?: string;
+  year?: string;
+  date?: string;
+  title: string;
+  description: string;
+};
+
+/** Label periode sebuah item cerita: "Januari 2023", jatuh kembali ke `date`. */
+export function storyPeriod(item: StoryItem): string {
+  const period = [item.month, item.year].filter(Boolean).join(" ").trim();
+  return period || item.date || "";
+}
 
 export type WeddingData = {
   partner1: string;
@@ -17,12 +35,29 @@ export type WeddingData = {
   motherPria?: string | null;
   fatherWanita?: string | null;
   motherWanita?: string | null;
+  // ===== Acara =====
+  // Jam berformat "HH:mm". Venue/maps per-acara lebih diutamakan theme,
+  // dengan `location`/`mapsUrl` sebagai fallback data lama.
   akadDate?: string | null;
+  akadStart?: string | null;
+  akadEnd?: string | null;
+  akadVenue?: string | null;
+  akadMapsUrl?: string | null;
   resepsiDate?: string | null;
+  resepsiStart?: string | null;
+  resepsiEnd?: string | null;
+  resepsiVenue?: string | null;
+  resepsiMapsUrl?: string | null;
   location?: string | null;
   mapsUrl?: string | null;
   message?: string | null;
   quote?: string | null;
+  quoteSource?: string | null;
+  // ===== Media =====
+  heroImage?: string | null;
+  quoteImage?: string | null;
+  photoPria?: string | null;
+  photoWanita?: string | null;
   instagram1?: string | null;
   instagram2?: string | null;
   storyEnabled?: boolean | null;

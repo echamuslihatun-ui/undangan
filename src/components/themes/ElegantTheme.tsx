@@ -29,6 +29,7 @@ import {
 } from "lucide-react";
 import CountdownTimer from "@/components/CountdownTimer";
 import type { WeddingData, StoryItem } from "./types";
+import { storyPeriod } from "./types";
 
 /* ============================================================
    Utilitas normalisasi data (photos/bankAccounts/story bisa
@@ -316,6 +317,26 @@ function formatTimeID(value?: string | null) {
   });
 }
 
+/**
+ * Rangkai label jam acara dari jam mulai & selesai yang kini berdiri sendiri
+ * (format "HH:MM"). Bila keduanya kosong, jatuh kembali ke jam yang mungkin
+ * masih menempel pada nilai tanggal (data lama).
+ */
+function formatEventTime(
+  start?: string | null,
+  end?: string | null,
+  fallbackDate?: string | null
+) {
+  if (start && end) return `${start} - ${end} WIB`;
+  if (start) return `${start} WIB`;
+  const fromDate = fallbackDate ? formatTimeID(fallbackDate) : null;
+  // Data lama tanpa jam tersimpan sebagai 00.00; jangan tampilkan jam palsu.
+  if (fromDate && fromDate !== "00.00" && fromDate !== "00:00") {
+    return `${fromDate} WIB`;
+  }
+  return null;
+}
+
 /* ============================================================
    Theme utama.
    ============================================================ */
@@ -328,7 +349,22 @@ export default function ElegantTheme({ wedding }: { wedding: WeddingData }) {
   }>(wedding.bankAccounts);
   const story = parseArray<StoryItem>(wedding.story);
   const eventDate = wedding.resepsiDate || wedding.akadDate || null;
-  const heroImage = photos[0] || HERO_FALLBACK;
+  // Gambar cover kini bisa diatur sendiri di dashboard; galeri hanya cadangan.
+  const heroImage = wedding.heroImage || photos[0] || HERO_FALLBACK;
+  const akadTime = formatEventTime(wedding.akadStart, wedding.akadEnd, wedding.akadDate);
+  const resepsiTime = formatEventTime(
+    wedding.resepsiStart,
+    wedding.resepsiEnd,
+    wedding.resepsiDate
+  );
+  // Tempat & peta per acara, dengan lokasi umum sebagai cadangan.
+  const akadVenue = wedding.akadVenue || wedding.location;
+  const akadMapsUrl = wedding.akadMapsUrl || wedding.mapsUrl;
+  const resepsiVenue = wedding.resepsiVenue || wedding.location;
+  const resepsiMapsUrl = wedding.resepsiMapsUrl || wedding.mapsUrl;
+  // Blok lokasi umum hanya perlu tampil bila tiap acara belum punya tempat sendiri.
+  const showGeneralLocation =
+    !!wedding.location && !wedding.akadVenue && !wedding.resepsiVenue;
 
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
   const [copied, setCopied] = useState<string | null>(null);
@@ -420,6 +456,20 @@ export default function ElegantTheme({ wedding }: { wedding: WeddingData }) {
       {/* ============ QUOTE ============ */}
       {wedding.quote && (
         <section className="relative overflow-hidden bg-[#5c4a32] py-24 sm:py-32">
+          {/* Latar kutipan opsional; tanpa gambar tetap memakai warna solid. */}
+          {wedding.quoteImage && (
+            <div className="absolute inset-0">
+              <Image
+                src={wedding.quoteImage}
+                alt=""
+                aria-hidden
+                fill
+                sizes="100vw"
+                className="object-cover"
+              />
+              <div className="absolute inset-0 bg-[#3d2f1f]/75" />
+            </div>
+          )}
           <motion.div
             variants={fadeUp}
             initial="hidden"
@@ -432,6 +482,11 @@ export default function ElegantTheme({ wedding }: { wedding: WeddingData }) {
             <p className="font-serif-display text-lg italic leading-relaxed text-[#fdf8f0]/90 sm:text-xl md:text-2xl">
               {wedding.quote}
             </p>
+            {wedding.quoteSource && (
+              <p className="mt-6 text-xs uppercase tracking-[0.25em] text-[#c9a96e]">
+                {wedding.quoteSource}
+              </p>
+            )}
           </motion.div>
         </section>
       )}
@@ -444,6 +499,17 @@ export default function ElegantTheme({ wedding }: { wedding: WeddingData }) {
           <div className="flex flex-col items-center justify-center gap-12 md:flex-row md:gap-20">
             {/* Mempelai Pria */}
             <div className="flex flex-col items-center text-center">
+              {wedding.photoPria && (
+                <div className="relative mb-5 h-36 w-36 overflow-hidden rounded-full border-2 border-[#c9a96e]/50 shadow-md sm:h-44 sm:w-44">
+                  <Image
+                    src={wedding.photoPria}
+                    alt={wedding.partner1 || "Mempelai Pria"}
+                    fill
+                    sizes="176px"
+                    className="object-cover"
+                  />
+                </div>
+              )}
               <p className="mb-1 text-xs uppercase tracking-[0.2em] text-[#8b7355]">
                 Mempelai Pria
               </p>
@@ -489,6 +555,17 @@ export default function ElegantTheme({ wedding }: { wedding: WeddingData }) {
 
             {/* Mempelai Wanita */}
             <div className="flex flex-col items-center text-center">
+              {wedding.photoWanita && (
+                <div className="relative mb-5 h-36 w-36 overflow-hidden rounded-full border-2 border-[#c9a96e]/50 shadow-md sm:h-44 sm:w-44">
+                  <Image
+                    src={wedding.photoWanita}
+                    alt={wedding.partner2 || "Mempelai Wanita"}
+                    fill
+                    sizes="176px"
+                    className="object-cover"
+                  />
+                </div>
+              )}
               <p className="mb-1 text-xs uppercase tracking-[0.2em] text-[#8b7355]">
                 Mempelai Wanita
               </p>
@@ -563,10 +640,29 @@ export default function ElegantTheme({ wedding }: { wedding: WeddingData }) {
                 <p className="mb-1 font-serif-display text-lg text-[#5c4a32]">
                   {formatDateID(wedding.akadDate)}
                 </p>
-                <div className="mb-3 flex items-center gap-2 text-sm text-[#8b7355]">
-                  <Clock className="h-4 w-4" />
-                  {formatTimeID(wedding.akadDate)} WIB
-                </div>
+                {akadTime && (
+                  <div className="mb-3 flex items-center gap-2 text-sm text-[#8b7355]">
+                    <Clock className="h-4 w-4" />
+                    {akadTime}
+                  </div>
+                )}
+                {akadVenue && (
+                  <div className="flex items-start gap-2 text-sm text-[#5c4a32]/80">
+                    <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-[#c9a96e]" />
+                    <span>{akadVenue}</span>
+                  </div>
+                )}
+                {akadMapsUrl && (
+                  <a
+                    href={akadMapsUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="mt-4 inline-flex items-center gap-2 rounded-lg border border-[#c9a96e] px-4 py-2 text-sm font-medium text-[#5c4a32] transition hover:bg-[#c9a96e] hover:text-[#fdf8f0]"
+                  >
+                    <MapPin className="h-4 w-4" />
+                    Lihat Lokasi
+                  </a>
+                )}
               </motion.div>
             )}
 
@@ -591,15 +687,34 @@ export default function ElegantTheme({ wedding }: { wedding: WeddingData }) {
                 <p className="mb-1 font-serif-display text-lg text-[#5c4a32]">
                   {formatDateID(wedding.resepsiDate)}
                 </p>
-                <div className="mb-3 flex items-center gap-2 text-sm text-[#8b7355]">
-                  <Clock className="h-4 w-4" />
-                  {formatTimeID(wedding.resepsiDate)} WIB
-                </div>
+                {resepsiTime && (
+                  <div className="mb-3 flex items-center gap-2 text-sm text-[#8b7355]">
+                    <Clock className="h-4 w-4" />
+                    {resepsiTime}
+                  </div>
+                )}
+                {resepsiVenue && (
+                  <div className="flex items-start gap-2 text-sm text-[#5c4a32]/80">
+                    <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-[#c9a96e]" />
+                    <span>{resepsiVenue}</span>
+                  </div>
+                )}
+                {resepsiMapsUrl && (
+                  <a
+                    href={resepsiMapsUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="mt-4 inline-flex items-center gap-2 rounded-lg border border-[#c9a96e] px-4 py-2 text-sm font-medium text-[#5c4a32] transition hover:bg-[#c9a96e] hover:text-[#fdf8f0]"
+                  >
+                    <MapPin className="h-4 w-4" />
+                    Lihat Lokasi
+                  </a>
+                )}
               </motion.div>
             )}
           </div>
 
-          {wedding.location && (
+          {showGeneralLocation && (
             <motion.div
               variants={fadeUp}
               initial="hidden"
@@ -665,7 +780,7 @@ export default function ElegantTheme({ wedding }: { wedding: WeddingData }) {
                       <Heart className="h-3 w-3 fill-[#c9a96e] text-[#c9a96e]" />
                     </div>
                     <span className="font-display text-3xl text-[#c9a96e]">
-                      {item.date}
+                      {storyPeriod(item)}
                     </span>
                     <h3 className="mb-2 font-playfair text-xl font-semibold text-[#5c4a32]">
                       {item.title}

@@ -1,10 +1,17 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { motion } from "framer-motion";
 import { Share2, Smartphone, Monitor, Eye } from "lucide-react";
-import ThemeRenderer from "@/components/themes/ThemeRenderer";
 import { useToast } from "@/components/Toast";
+
+/**
+ * Lebar viewport yang disimulasikan tiap mode. Preview dirender di dalam
+ * iframe agar tema yang memakai `position: fixed` dan satuan `vh`/`vw`
+ * (mis. Elegant) tetap terkurung di dalam bidang preview.
+ */
+const DEVICE_WIDTH = { mobile: 390, desktop: 1280 } as const;
+const DEVICE_HEIGHT = { mobile: 780, desktop: 800 } as const;
 
 type Wedding = {
   id: string;
@@ -43,7 +50,21 @@ export default function PreviewPage() {
   const [themeKey, setThemeKey] = useState("classic");
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [loading, setLoading] = useState(true);
+  // Lebar kotak penampung dipakai untuk menghitung skala iframe desktop.
+  const [stageWidth, setStageWidth] = useState(0);
+  const stageRef = useRef<HTMLDivElement>(null);
   const { showToast } = useToast();
+
+  useEffect(() => {
+    const el = stageRef.current;
+    if (!el) return;
+    const observer = new ResizeObserver(([entry]) => {
+      setStageWidth(entry.contentRect.width);
+    });
+    observer.observe(el);
+    setStageWidth(el.clientWidth);
+    return () => observer.disconnect();
+  }, [loading]);
 
   useEffect(() => {
     async function fetchData() {
@@ -74,6 +95,16 @@ export default function PreviewPage() {
 
   if (loading) return <div className="text-center py-12">Loading...</div>;
 
+  const frameWidth = DEVICE_WIDTH[device];
+  const frameHeight = DEVICE_HEIGHT[device];
+  // Perkecil bila viewport simulasi lebih lebar dari ruang yang tersedia.
+  const scale = stageWidth > 0 ? Math.min(1, stageWidth / frameWidth) : 1;
+  const previewSrc = `/preview-frame?theme=${encodeURIComponent(themeKey)}`;
+  const shareUrl =
+    wedding?.slug && typeof window !== "undefined"
+      ? `${window.location.origin}/public/weddings/${wedding.slug}`
+      : "";
+
   return (
     <div>
       <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -95,22 +126,51 @@ export default function PreviewPage() {
         </div>
       </div>
 
-      <div className="flex justify-center rounded-xl border border-border bg-muted/30 p-4 md:p-8">
-        <div className={`${device === "mobile" ? "w-full max-w-sm" : "w-full max-w-2xl"}`}>
-          {wedding ? (
-            <ThemeRenderer themeKey={themeKey} wedding={wedding} />
-          ) : (
-            <div className="text-center py-12 text-muted-foreground">Data undangan belum tersedia.</div>
-          )}
-        </div>
+      <div
+        ref={stageRef}
+        className="flex justify-center overflow-hidden rounded-xl border border-border bg-muted/30 p-4 md:p-8"
+      >
+        {wedding ? (
+          <div
+            // Tinggi wadah ikut menyusut bersama skala agar tidak ada ruang kosong.
+            style={{ width: frameWidth * scale, height: frameHeight * scale }}
+            className={`overflow-hidden bg-white shadow-lg ${
+              device === "mobile" ? "rounded-[2rem] border-4 border-neutral-800" : "rounded-xl border border-border"
+            }`}
+          >
+            <iframe
+              key={`${themeKey}-${device}`}
+              src={previewSrc}
+              title="Preview undangan"
+              style={{
+                width: frameWidth,
+                height: frameHeight,
+                transform: `scale(${scale})`,
+                transformOrigin: "top left",
+                border: "none",
+              }}
+            />
+          </div>
+        ) : (
+          <div className="py-12 text-center text-muted-foreground">Data undangan belum tersedia.</div>
+        )}
       </div>
 
       {isFullscreen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 p-4">
           <div className="relative w-full max-w-6xl overflow-hidden rounded-3xl bg-white shadow-2xl">
             <button onClick={() => setIsFullscreen(false)} className="absolute right-4 top-4 z-20 rounded-full bg-white p-3 text-sm font-semibold shadow-sm">Tutup</button>
-            <div className="h-[90vh] overflow-auto bg-muted p-4">
-              {wedding ? <ThemeRenderer themeKey={themeKey} wedding={wedding} /> : <div className="text-center py-12 text-muted-foreground">Data undangan belum tersedia.</div>}
+            <div className="h-[90vh] bg-muted">
+              {wedding ? (
+                <iframe
+                  key={`fullscreen-${themeKey}`}
+                  src={previewSrc}
+                  title="Preview undangan fullscreen"
+                  className="h-full w-full border-none"
+                />
+              ) : (
+                <div className="py-12 text-center text-muted-foreground">Data undangan belum tersedia.</div>
+              )}
             </div>
           </div>
         </div>
@@ -128,12 +188,12 @@ export default function PreviewPage() {
             <input
               type="text"
               readOnly
-              value={`${window.location.origin}/u/${wedding.slug}`}
+              value={shareUrl}
               className="flex-1 rounded-lg border border-border bg-muted/30 px-3 py-2 text-sm"
             />
             <button
               onClick={() => {
-                navigator.clipboard.writeText(`${window.location.origin}/u/${wedding.slug}`);
+                navigator.clipboard.writeText(shareUrl);
                 showToast("success", "Link berhasil disalin!");
               }}
               className="btn-primary"
