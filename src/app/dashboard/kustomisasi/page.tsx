@@ -178,10 +178,30 @@ export default function KustomisasiPage() {
           throw new Error(err?.error || "Gagal mengambil template");
         }
 
+        // Set daftar template LEBIH DULU, sebelum memproses data wedding.
+        // Untuk pelanggan baru, `/api/wedding` mengembalikan null; pemrosesan
+        // data wedding di bawah bisa gagal, dan jika setTemplates ditaruh
+        // sesudahnya, daftar template tidak akan pernah tampil. Menaruhnya di
+        // sini memastikan template selalu muncul, baik data wedding ada maupun tidak.
+        const templatesData = await templatesRes.json();
+        setTemplates(
+          Array.isArray(templatesData)
+            ? templatesData.filter((t: Template) => t.status === "active")
+            : []
+        );
+
         const weddingData = await weddingRes.json();
+        // Pelanggan yang belum pernah menyimpan data pernikahan akan mendapat
+        // `null` dari API. Dalam kasus ini, biarkan form memakai nilai default
+        // (state awal) dan jangan memproses lebih lanjut agar tidak crash.
+        if (!weddingData) {
+          return;
+        }
+
         const bankAccounts = typeof weddingData.bankAccounts === "string"
           ? JSON.parse(weddingData.bankAccounts || "[]")
           : weddingData.bankAccounts || [];
+
         const photos = typeof weddingData.photos === "string"
           ? JSON.parse(weddingData.photos || "[]")
           : weddingData.photos || [];
@@ -240,10 +260,8 @@ export default function KustomisasiPage() {
           bankAccounts,
           story,
         });
-
-        const templatesData = await templatesRes.json();
-        setTemplates(templatesData.filter((t: Template) => t.status === "active"));
       } catch (error) {
+
         console.error("Failed to fetch data:", error);
       } finally {
         setLoading(false);
