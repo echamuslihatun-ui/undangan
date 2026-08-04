@@ -12,6 +12,11 @@ const GENERIC_AUTH_ERROR = "Email atau password salah";
 
 export const authOptions: NextAuthOptions = {
   adapter: PrismaAdapter(prisma) as NextAuthOptions["adapter"],
+  // Diambil otomatis dari NEXTAUTH_SECRET; ditulis eksplisit agar jelas.
+  secret: process.env.NEXTAUTH_SECRET,
+  // Aktifkan log detail NextAuth di luar production supaya penyebab kegagalan
+  // OAuth (mis. state mismatch, token exchange gagal) terlihat.
+  debug: process.env.NODE_ENV !== "production",
   session: {
     strategy: "jwt",
   },
@@ -19,6 +24,18 @@ export const authOptions: NextAuthOptions = {
     signIn: "/login",
     newUser: "/dashboard",
   },
+  // Teruskan error internal NextAuth ke logger kita supaya muncul di log Vercel.
+  // Tanpa ini, kegagalan OAuth callback sering "diam" (cuma redirect 302 ke
+  // halaman error) tanpa jejak penyebab di server.
+  logger: {
+    error(code, metadata) {
+      logger.error("NextAuth error", metadata, { code });
+    },
+    warn(code) {
+      logger.warn("NextAuth warning", { code });
+    },
+  },
+
   providers: [
     GoogleProvider({
       clientId: process.env.GOOGLE_CLIENT_ID || "",
@@ -91,10 +108,34 @@ export const authOptions: NextAuthOptions = {
       },
     }),
   ],
+  events: {
+    async signIn({ user, account, isNewUser }) {
+      logger.info("OAuth signIn berhasil", {
+        email: user.email,
+        provider: account?.provider,
+        isNewUser,
+      });
+    },
+  },
   callbacks: {
+    async signIn({ account, profile }) {
+      // Jalur credentials sudah divalidasi di authorize(); lolos apa adanya.
+      if (account?.provider !== "google") return true;
+      // Google kadang mengembalikan email yang belum terverifikasi. Tolak
+      // supaya tidak ada akun "nyangkut" tanpa email valid.
+      const verified = (profile as any)?.email_verified;
+      if (verified === false) {
+        logger.warn("OAuth ditolak: email Google belum terverifikasi", {
+          email: (profile as any)?.email,
+        });
+        return false;
+      }
+      return true;
+    },
     async jwt({ token, user }) {
       if (user) {
         token.id = user.id;
+
         const dbUser = await prisma.user.findUnique({
           where: { id: user.id },
           select: { role: true, status: true } as any,

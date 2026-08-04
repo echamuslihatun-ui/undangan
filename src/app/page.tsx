@@ -87,13 +87,16 @@ export default function Home() {
   useEffect(() => {
     async function fetchTemplates() {
       try {
-        const res = await fetch("/api/templates");
+        const res = await fetch("/api/templates", { cache: "no-store" });
         if (res.ok) {
           const data = await res.json();
           setTemplates(data);
+        } else {
+          console.error("Templates fetch failed:", res.status);
         }
       } catch (error) {
         console.error("Failed to fetch templates:", error);
+
       } finally {
         setLoading(false);
       }

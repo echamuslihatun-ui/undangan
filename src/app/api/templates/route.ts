@@ -3,7 +3,14 @@ import { prisma } from "@/lib/prisma";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 
+// Daftar template harus selalu fresh dari database. Tanpa ini, App Router
+// men-cache respons GET secara statis saat build, sehingga template baru yang
+// ditambahkan admin tidak muncul di sisi pelanggan sampai deploy ulang.
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 export async function GET() {
+
   try {
     const templates = await prisma.template.findMany({
       orderBy: { createdAt: "desc" },

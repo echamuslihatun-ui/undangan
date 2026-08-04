@@ -57,8 +57,9 @@ export default function AdminTemplatePage() {
   useEffect(() => {
     async function fetchTemplates() {
       try {
-        const res = await fetch("/api/templates");
+        const res = await fetch("/api/templates", { cache: "no-store" });
         if (res.ok) setTemplates(await res.json());
+
       } catch {
         showToast("error", "Gagal memuat data template");
       } finally {

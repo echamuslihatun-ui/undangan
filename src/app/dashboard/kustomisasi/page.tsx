@@ -162,7 +162,8 @@ export default function KustomisasiPage() {
       try {
         const [weddingRes, templatesRes] = await Promise.all([
           fetch("/api/wedding", { credentials: "same-origin" }),
-          fetch("/api/templates", { credentials: "same-origin" }),
+          fetch("/api/templates", { credentials: "same-origin", cache: "no-store" }),
+
         ]);
 
         if (!weddingRes.ok) {

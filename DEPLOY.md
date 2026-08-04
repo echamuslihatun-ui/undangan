@@ -125,3 +125,48 @@ npm run seed:admin
 - Domain gambar Cloudinary (`res.cloudinary.com`) sudah diizinkan di `next.config.js`.
 - Aplikasi hanya memakai Supabase sebagai Postgres biasa lewat Prisma — tidak memakai
   Supabase Auth (autentikasi ditangani NextAuth) maupun Row Level Security.
+
+---
+
+## Troubleshooting: Login Google gagal di Vercel
+
+Gejala umum: klik "Login dengan Google" → balik lagi ke halaman login (atau
+`/api/auth/error`), dan di log Vercel `GET /api/auth/callback/google` merespons
+**302**.
+
+> Catatan penting: status **302 pada callback itu NORMAL**. NextAuth selalu
+> redirect setelah callback — entah ke `/dashboard` (sukses) atau ke halaman
+> error (gagal). Jadi 302 sendiri bukan bukti error. Yang perlu dicek adalah
+> **tujuan redirect** (`Location`) dan **isi log**.
+
+Tanda callback GAGAL sebelum tukar token: durasi function sangat singkat
+(mis. ~50ms) dan **tidak ada outgoing request** ke Google di panel Vercel.
+Ini ciri khas **cookie `state` mismatch**, hampir selalu karena `NEXTAUTH_URL`
+salah.
+
+Cek berurutan dari yang paling sering:
+
+1. **`NEXTAUTH_URL` di Environment Variables Vercel** harus sama persis dengan
+   domain yang dipakai user, termasuk skema `https://` dan tanpa trailing slash,
+   mis. `https://undangan-one-jade.vercel.app`. Kalau kosong atau masih
+   `http://localhost:3000`, cookie state tidak cocok → login gagal.
+2. **`NEXTAUTH_SECRET` harus terisi** di Vercel (wajib di production). Kalau
+   kosong, sesi/JWT tidak bisa dienkripsi.
+3. **Authorized redirect URI di Google Cloud Console** harus memuat persis:
+   `https://<domain>/api/auth/callback/google`
+   dan Authorized JavaScript origins: `https://<domain>`.
+4. **Skema database sudah di-`prisma db push` ke Supabase.** Karena memakai
+   `PrismaAdapter`, login Google menulis ke tabel `User`, `Account`, `Session`.
+   Bila tabel belum ada, adapter melempar error dan login gagal.
+5. **Env var Google benar & tidak tertukar** (`GOOGLE_CLIENT_ID` /
+   `GOOGLE_CLIENT_SECRET`), untuk OAuth client yang sama dengan redirect URI di
+   atas.
+
+Setiap perubahan Environment Variables **butuh redeploy** agar berlaku.
+
+Aplikasi ini menulis error internal NextAuth ke log Vercel (lihat konfigurasi
+`logger` di `src/lib/auth.ts`), jadi periksa **Vercel → Deployment → Functions →
+Logs** untuk pesan `NextAuth error` yang menyertakan `code` (mis.
+`OAUTH_CALLBACK_ERROR`, `OAUTH_CALLBACK_HANDLER_ERROR`) sebagai petunjuk pasti.
+
+
