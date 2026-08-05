@@ -6,7 +6,13 @@ import {
   Great_Vibes,
   Cormorant_Garamond,
 } from "next/font/google";
+import { initEnvironment } from "@/lib/env";
 import "./globals.css";
+
+// Initialize environment validation (server-side only)
+if (typeof window === "undefined") {
+  initEnvironment();
+}
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
 const playfair = Playfair_Display({ subsets: ["latin"], variable: "--font-playfair" });

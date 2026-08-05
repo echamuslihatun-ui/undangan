@@ -25,7 +25,7 @@ export default function LoginPage() {
 
     setLoading(false);
     if (result?.error) {
-      setError("Email atau password salah");
+      setError(result.error.includes("EMAIL_NOT_VERIFIED") ? "Email belum diverifikasi. Periksa inbox Anda." : "Email atau password salah");
       return;
     }
 
@@ -91,10 +91,10 @@ export default function LoginPage() {
             </div>
             <div className="flex items-center justify-between text-sm">
               <label className="flex items-center gap-2">
-                <input type="checkbox" className="rounded border-border" />
+                <input type="checkbox" disabled title="Sesi aman tersimpan otomatis" className="rounded border-border" />
                 <span className="text-muted-foreground">Ingat saya</span>
               </label>
-              <button type="button" onClick={() => alert('Fitur reset password akan segera tersedia.')} className="font-medium text-primary hover:underline">Lupa password?</button>
+              <Link href="/forgot-password" className="font-medium text-primary hover:underline">Lupa password?</Link>
             </div>
             <button type="submit" disabled={loading} className="btn-primary w-full">{loading ? "Memproses..." : "Masuk"}</button>
           </form>

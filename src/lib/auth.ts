@@ -5,6 +5,7 @@ import { PrismaAdapter } from "@auth/prisma-adapter";
 import { prisma } from "@/lib/prisma";
 import { logger } from "@/lib/logger";
 import bcrypt from "bcryptjs";
+import { normalizeEmail } from "@/lib/account-security";
 
 // Pesan generik untuk klien. Alasan kegagalan yang sebenarnya hanya masuk log
 // server, supaya tidak membocorkan email mana yang terdaftar.
@@ -55,7 +56,7 @@ export const authOptions: NextAuthOptions = {
         let user: any;
         try {
           user = await prisma.user.findUnique({
-            where: { email: credentials.email },
+            where: { email: normalizeEmail(credentials.email) },
           });
         } catch (error) {
           // Query gagal (skema belum di-push, pooler bermasalah, kredensial salah).
@@ -90,6 +91,19 @@ export const authOptions: NextAuthOptions = {
           throw new Error(GENERIC_AUTH_ERROR);
         }
 
+        // Periksa verifikasi hanya setelah password benar agar respons login
+        // tidak dapat dipakai untuk menebak akun mana yang terdaftar.
+        if (!user.emailVerified) {
+          const pendingVerification = await prisma.authToken.findFirst({
+            where: { userId: user.id, type: "verify_email" },
+            select: { id: true },
+          });
+          if (pendingVerification) {
+            logger.warn("Login gagal: email belum diverifikasi", { email: credentials.email });
+            throw new Error("EMAIL_NOT_VERIFIED");
+          }
+        }
+
         if (user.status === "suspended") {
           logger.warn("Login gagal: akun disuspend", { email: credentials.email });
           throw new Error("Akun Anda sedang disuspend");
@@ -104,6 +118,7 @@ export const authOptions: NextAuthOptions = {
           image: user.image,
           role: user.role,
           status: user.status,
+          authVersion: user.authVersion,
         };
       },
     }),
@@ -138,27 +153,34 @@ export const authOptions: NextAuthOptions = {
 
         const dbUser = await prisma.user.findUnique({
           where: { id: user.id },
-          select: { role: true, status: true } as any,
+          select: { role: true, status: true, authVersion: true } as any,
         }) as any;
         token.role = dbUser?.role ?? (user as any).role ?? "customer";
         token.status = dbUser?.status ?? (user as any).status ?? "active";
+        token.authVersion = dbUser?.authVersion ?? (user as any).authVersion ?? 0;
       } else if (token.id) {
         const dbUser = await prisma.user.findUnique({
           where: { id: token.id as string },
-          select: { role: true, status: true } as any,
+          select: { role: true, status: true, authVersion: true } as any,
         }) as any;
-        if (dbUser) {
+        if (dbUser && dbUser.authVersion === token.authVersion) {
           token.role = dbUser.role;
           token.status = dbUser.status;
+        } else {
+          delete token.id;
         }
       }
       return token;
     },
     async session({ session, token }) {
-      if (session.user) {
+      if (session.user && token.id) {
         session.user.id = token.id as string;
         session.user.role = token.role as string;
         session.user.status = token.status as string;
+      } else if (session.user) {
+        // Membuat middleware/getServerSession memperlakukan JWT yang dicabut
+        // sebagai sesi tanpa identitas pengguna.
+        session.user.id = "";
       }
       return session;
     },

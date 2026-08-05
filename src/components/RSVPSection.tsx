@@ -26,6 +26,7 @@ export default function RSVPSection({
 
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+  const [submittedStatus, setSubmittedStatus] = useState<RSVPForm["attendanceStatus"]>("pending");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [formData, setFormData] = useState<RSVPForm>({
 
@@ -50,6 +51,7 @@ export default function RSVPSection({
 
 
       if (res.ok) {
+        setSubmittedStatus(formData.attendanceStatus);
         setSubmitted(true);
       } else {
         const errorData = await res.json().catch(() => null);
@@ -73,7 +75,11 @@ export default function RSVPSection({
           </div>
           <h2 className="mt-4 font-serif text-2xl font-bold">Terima Kasih!</h2>
           <p className="mt-2 text-muted-foreground">
-            RSVP Anda telah berhasil dikirim. Kami tunggu kehadiran Anda.
+            {submittedStatus === "confirmed"
+              ? "Konfirmasi berhasil dikirim. Kami tunggu kehadiran Anda."
+              : submittedStatus === "declined"
+                ? "Konfirmasi berhasil dikirim. Terima kasih telah memberi kabar."
+                : "Konfirmasi berhasil dikirim. Anda dapat menghubungi pemilik undangan bila sudah menentukan pilihan."}
           </p>
         </div>
       </div>

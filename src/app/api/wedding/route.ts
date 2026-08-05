@@ -3,6 +3,22 @@ import { prisma } from "@/lib/prisma";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { getPackage } from "@/lib/packages";
+import {
+  createRandomCode,
+  normalizeString,
+  optionalHttpUrl,
+  optionalString,
+  parseOptionalDate,
+} from "@/lib/input";
+
+const THEME_KEYS = ["classic", "modern", "elegant"] as const;
+const TIME_PATTERN = /^([01]\d|2[0-3]):[0-5]\d$/;
+
+function optionalTime(value: unknown): string | null {
+  const time = optionalString(value, 5);
+  if (time && !TIME_PATTERN.test(time)) throw new Error("Format jam tidak valid");
+  return time;
+}
 
 export const dynamic = "force-dynamic";
 
@@ -46,35 +62,49 @@ export async function PUT(req: Request) {
     }
 
     const body = await req.json();
+    if (!body || typeof body !== "object" || Array.isArray(body)) {
+      return NextResponse.json({ error: "Payload tidak valid" }, { status: 400 });
+    }
+    const partner1 = normalizeString(body.partner1, 100);
+    const partner2 = normalizeString(body.partner2, 100);
+    if (!partner1 || !partner2) {
+      return NextResponse.json({ error: "Nama kedua mempelai wajib diisi" }, { status: 400 });
+    }
+    if (body.themeKey && !THEME_KEYS.includes(body.themeKey)) {
+      return NextResponse.json({ error: "Tema tidak valid" }, { status: 400 });
+    }
+    const story = Array.isArray(body.story) ? body.story.slice(0, 20) : [];
+    const photos = Array.isArray(body.photos) ? body.photos.slice(0, 30) : [];
+    const bankAccounts = Array.isArray(body.bankAccounts) ? body.bankAccounts.slice(0, 10) : [];
     const allowedData: Record<string, unknown> = {
-      partner1: body.partner1,
-      partner2: body.partner2,
-      nickname1: body.nickname1,
-      nickname2: body.nickname2,
-      parent1: body.parent1,
-      parent2: body.parent2,
-      fatherPria: body.fatherPria,
-      motherPria: body.motherPria,
-      fatherWanita: body.fatherWanita,
-      motherWanita: body.motherWanita,
-      themeKey: body.themeKey,
+      partner1,
+      partner2,
+      nickname1: optionalString(body.nickname1, 100),
+      nickname2: optionalString(body.nickname2, 100),
+      parent1: optionalString(body.parent1, 200),
+      parent2: optionalString(body.parent2, 200),
+      fatherPria: optionalString(body.fatherPria, 100),
+      motherPria: optionalString(body.motherPria, 100),
+      fatherWanita: optionalString(body.fatherWanita, 100),
+      motherWanita: optionalString(body.motherWanita, 100),
+      themeKey: body.themeKey || "classic",
       // Akad
-      akadDate: body.akadDate ? new Date(body.akadDate) : null,
-      akadStart: body.akadStart,
-      akadEnd: body.akadEnd,
-      akadVenue: body.akadVenue,
-      akadMapsUrl: body.akadMapsUrl,
+      akadDate: parseOptionalDate(body.akadDate),
+      akadStart: optionalTime(body.akadStart),
+      akadEnd: optionalTime(body.akadEnd),
+      akadVenue: optionalString(body.akadVenue, 300),
+      akadMapsUrl: optionalHttpUrl(body.akadMapsUrl),
       // Resepsi
-      resepsiDate: body.resepsiDate ? new Date(body.resepsiDate) : null,
-      resepsiStart: body.resepsiStart,
-      resepsiEnd: body.resepsiEnd,
-      resepsiVenue: body.resepsiVenue,
-      resepsiMapsUrl: body.resepsiMapsUrl,
-      location: body.location,
-      mapsUrl: body.mapsUrl,
-      message: body.message,
-      quote: body.quote,
-      quoteSource: body.quoteSource,
+      resepsiDate: parseOptionalDate(body.resepsiDate),
+      resepsiStart: optionalTime(body.resepsiStart),
+      resepsiEnd: optionalTime(body.resepsiEnd),
+      resepsiVenue: optionalString(body.resepsiVenue, 300),
+      resepsiMapsUrl: optionalHttpUrl(body.resepsiMapsUrl),
+      location: optionalString(body.location, 300),
+      mapsUrl: optionalHttpUrl(body.mapsUrl),
+      message: optionalString(body.message, 2000),
+      quote: optionalString(body.quote, 1000),
+      quoteSource: optionalString(body.quoteSource, 200),
       // Media
       heroImage: body.heroImage,
       quoteImage: body.quoteImage,
@@ -84,16 +114,16 @@ export async function PUT(req: Request) {
       instagram2: body.instagram2,
       // Section cerita cinta ditentukan murni oleh ada/tidaknya item cerita:
       // bila daftar dikosongkan, section otomatis tidak tampil di undangan.
-      storyEnabled: Array.isArray(body.story) ? body.story.length > 0 : undefined,
-      story: Array.isArray(body.story) ? JSON.stringify(body.story) : undefined,
-      photos: JSON.stringify(body.photos || []),
-      musicUrl: body.musicUrl,
-      bankName: body.bankName,
-      bankAccount: body.bankAccount,
-      bankHolder: body.bankHolder,
-      bankAccounts: body.bankAccounts ? JSON.stringify(body.bankAccounts) : undefined,
-      qrisImage: body.qrisImage,
-      customDomain: body.customDomain,
+      storyEnabled: story.length > 0,
+      story: JSON.stringify(story),
+      photos: JSON.stringify(photos),
+      musicUrl: optionalHttpUrl(body.musicUrl),
+      bankName: optionalString(body.bankName, 100),
+      bankAccount: optionalString(body.bankAccount, 100),
+      bankHolder: optionalString(body.bankHolder, 100),
+      bankAccounts: JSON.stringify(bankAccounts),
+      qrisImage: optionalHttpUrl(body.qrisImage),
+      customDomain: optionalString(body.customDomain, 253)?.toLowerCase() ?? null,
     };
 
     // Slug dibuat SEKALI saja dan tidak pernah diubah pada update biasa,
@@ -111,7 +141,7 @@ export async function PUT(req: Request) {
       const first = (body.nickname1 || body.partner1 || "").trim();
       const second = (body.nickname2 || body.partner2 || "").trim();
       const base = slugify([first, second].filter(Boolean).join("-")) || "undangan";
-      const randomCode = Math.random().toString(36).replace(/[^a-z0-9]/g, "").substring(0, 4) || "0000";
+      const randomCode = createRandomCode(6);
       // Sanitasi akhir agar slug DIJAMIN hanya mengandung [a-z0-9-] sejak awal,
       // bukan hanya diperbaiki belakangan lewat healing.
       const slug = slugify(`${base}-${randomCode}`);
@@ -167,8 +197,8 @@ export async function PUT(req: Request) {
 
     const createData = {
       userId,
-      partner1: body.partner1 || "Pasangan",
-      partner2: body.partner2 || "Undangan",
+      partner1,
+      partner2,
       slug: (allowedData as any).slug ?? buildSlug(),
       ...allowedData,
       ...(activation ?? {}),
@@ -183,6 +213,9 @@ export async function PUT(req: Request) {
     return NextResponse.json(wedding);
   } catch (error) {
     console.error("Wedding update error:", error);
+    if (error instanceof Error && ["Tanggal tidak valid", "URL tidak valid", "Format jam tidak valid"].includes(error.message)) {
+      return NextResponse.json({ error: error.message }, { status: 400 });
+    }
     return NextResponse.json({ error: "Gagal update data" }, { status: 500 });
   }
 }

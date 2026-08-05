@@ -33,6 +33,23 @@ npx prisma migrate dev
 npm run dev
 ```
 
+### Email akun
+
+Registrasi credentials kini memerlukan verifikasi email dan halaman **Lupa
+Password** mengirim tautan sekali pakai. Konfigurasikan `RESEND_API_KEY` serta
+`EMAIL_FROM` (domain pengirim harus terverifikasi di Resend). Di development,
+tanpa konfigurasi tersebut, tautan aman dicetak ke log server agar alur dapat
+diuji secara lokal.
+
+Setelah menarik perubahan schema, sinkronkan database dan jalankan validasi:
+
+```bash
+npx prisma db push
+npm test
+npm run lint
+npm run build
+```
+
 ## Scripts
 
 - `npm run dev` - Jalankan development server

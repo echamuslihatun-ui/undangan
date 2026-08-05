@@ -34,25 +34,9 @@ export async function GET() {
 }
 
 export async function POST(req: Request) {
-  try {
-    const body = await req.json();
-    const { weddingId, guestName, message } = body;
-
-    if (!weddingId || !guestName || !message) {
-      return NextResponse.json({ error: "Data tidak lengkap" }, { status: 400 });
-    }
-
-    const newMessage = await prisma.message.create({
-      data: {
-        weddingId,
-        guestName,
-        message,
-      },
-    });
-
-    return NextResponse.json(newMessage, { status: 201 });
-  } catch (error) {
-    console.error("Message create error:", error);
-    return NextResponse.json({ error: "Gagal mengirim pesan" }, { status: 500 });
-  }
+  void req;
+  return NextResponse.json(
+    { error: "Endpoint ini sudah tidak digunakan. Kirim ucapan melalui tautan undangan tamu." },
+    { status: 410 }
+  );
 }

@@ -5,6 +5,18 @@
  */
 export type BankAccount = { bank: string; account: string; holder: string };
 
+/** Parse array JSON defensively so corrupt legacy data never crashes a theme. */
+export function themeArray<T>(value: T[] | string | null | undefined): T[] {
+  if (Array.isArray(value)) return value;
+  if (typeof value !== "string" || !value.trim()) return [];
+  try {
+    const parsed = JSON.parse(value);
+    return Array.isArray(parsed) ? (parsed as T[]) : [];
+  } catch {
+    return [];
+  }
+}
+
 /**
  * Satu item timeline "Cerita Cinta".
  * `month` + `year` adalah format baru (mis. "Januari" / "2023").

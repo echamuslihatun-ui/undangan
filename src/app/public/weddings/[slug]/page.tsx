@@ -4,6 +4,7 @@ import { Suspense, useState, useEffect } from "react";
 import { useParams, useSearchParams } from "next/navigation";
 import ThemeRenderer from "@/components/themes/ThemeRenderer";
 import RSVPSection from "@/components/RSVPSection";
+import GuestBookSection, { type PublicMessage } from "@/components/GuestBookSection";
 
 type Wedding = {
   id: string;
@@ -28,6 +29,7 @@ type Wedding = {
   bankAccounts?: Array<{ bank: string; account: string; holder: string }> | null;
   qrisImage?: string | null;
   themeKey?: string;
+  messages?: PublicMessage[];
 };
 
 function PublicWeddingContent() {
@@ -63,26 +65,18 @@ function PublicWeddingContent() {
           return;
         }
 
-        const res = await fetch(`/api/public/weddings/${encodeURIComponent(slug)}`);
+        const res = await fetch(
+          `/api/public/weddings/${encodeURIComponent(slug)}?to=${encodeURIComponent(guestSlug)}`
+        );
         if (!res.ok) {
-          setError(true);
+          if (res.status === 403) setInvalidAccess(true);
+          else setError(true);
           return;
         }
 
         const data = await res.json();
-
-        // Verifikasi tamu valid dan benar-benar milik undangan ini.
-        const guestRes = await fetch(
-          `/api/guests/${encodeURIComponent(guestSlug)}?weddingId=${encodeURIComponent(data.id)}`
-        );
-        if (!guestRes.ok) {
-          setInvalidAccess(true);
-          return;
-        }
-
-        const guestData = await guestRes.json();
-        setWedding(data);
-        setGuestInfo({ name: guestData.name, phone: guestData.phone });
+        setWedding(data.wedding);
+        setGuestInfo({ name: data.guest.name, phone: data.guest.phone });
       } catch (error) {
         console.error("Failed to fetch wedding:", error);
         setError(true);
@@ -136,7 +130,11 @@ function PublicWeddingContent() {
     <div className="min-h-screen bg-gray-100">
       <ThemeRenderer themeKey={wedding.themeKey || "classic"} wedding={wedding} />
       <RSVPSection weddingId={wedding.id} guest={guestInfo} guestSlug={guestSlug} />
-
+      <GuestBookSection
+        weddingId={wedding.id}
+        guestSlug={guestSlug || ""}
+        messages={wedding.messages || []}
+      />
     </div>
   );
 }

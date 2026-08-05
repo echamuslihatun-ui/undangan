@@ -31,13 +31,7 @@ export default function RegisterPage() {
         return;
       }
 
-      const login = await signIn("credentials", { email, password, redirect: false });
-      if (login?.error) {
-        window.location.href = "/login";
-        return;
-      }
-
-      window.location.href = "/dashboard";
+      window.location.href = `/verify-email?email=${encodeURIComponent(email)}`;
     } catch (err) {
       setError("Registrasi gagal. Silakan coba lagi.");
     } finally {
@@ -103,7 +97,7 @@ export default function RegisterPage() {
               <label className="mb-1.5 block text-sm font-medium">Password</label>
               <div className="relative">
                 <Lock className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                <input type={showPassword ? "text" : "password"} required value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Minimal 8 karakter" className="input-custom pl-10 pr-10" />
+                <input type={showPassword ? "text" : "password"} required minLength={8} maxLength={128} value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Minimal 8 karakter, huruf & angka" className="input-custom pl-10 pr-10" />
                 <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
                   {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                 </button>

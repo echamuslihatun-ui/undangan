@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { checkRateLimit, getRateLimitIdentifier } from "@/lib/rate-limit";
+import { activeWeddingWhere, normalizeText } from "@/lib/public-wedding";
 
 export const dynamic = "force-dynamic";
 
@@ -16,23 +17,37 @@ export async function POST(req: Request, { params }: { params: { id: string } })
       );
     }
 
-    const { guestName, message } = await req.json();
+    const body = await req.json();
+    const guestSlug = normalizeText(body.guestSlug, 160);
+    const message = normalizeText(body.message, 500);
 
-    if (!guestName || !message) {
-      return NextResponse.json({ error: "Nama dan ucapan harus diisi" }, { status: 400 });
+    if (!guestSlug || !message) {
+      return NextResponse.json({ error: "Tautan tamu dan ucapan harus valid" }, { status: 400 });
     }
 
-    const wedding = await prisma.wedding.findUnique({ where: { id: params.id } });
+    const wedding = await prisma.wedding.findFirst({
+      where: activeWeddingWhere(params.id),
+      select: { id: true },
+    });
     if (!wedding) {
       return NextResponse.json({ error: "Undangan tidak ditemukan" }, { status: 404 });
+    }
+
+    const guest = await prisma.guest.findFirst({
+      where: { slug: guestSlug, weddingId: wedding.id },
+      select: { name: true },
+    });
+    if (!guest) {
+      return NextResponse.json({ error: "Tautan undangan tidak valid" }, { status: 403 });
     }
 
     const newMessage = await prisma.message.create({
       data: {
         weddingId: wedding.id,
-        guestName,
+        guestName: guest.name,
         message,
       },
+      select: { id: true, isApproved: true },
     });
 
     return NextResponse.json(newMessage, { status: 201 });

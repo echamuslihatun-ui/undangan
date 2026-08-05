@@ -61,6 +61,8 @@ Di **Project → Settings → Environment Variables**, isi semua berikut (scope:
 | `DIRECT_URL` | Supabase session pooler, port `5432` |
 | `NEXTAUTH_URL` | Domain produksi, mis. `https://undangan.vercel.app` |
 | `NEXTAUTH_SECRET` | Generate: `openssl rand -base64 32` |
+| `RESEND_API_KEY` | API key Resend untuk email transaksional |
+| `EMAIL_FROM` | Pengirim pada domain yang sudah diverifikasi di Resend |
 | `GOOGLE_CLIENT_ID` | Dari Google Cloud Console |
 | `GOOGLE_CLIENT_SECRET` | Dari Google Cloud Console |
 | `MIDTRANS_SERVER_KEY` | Dari dashboard Midtrans |
@@ -85,6 +87,11 @@ npx prisma db push
 # Buat akun admin awal
 npm run seed:admin
 ```
+
+`RESEND_API_KEY` dan `EMAIL_FROM` diperlukan untuk verifikasi akun credentials
+serta reset password. Verifikasi domain pengirim di dashboard Resend terlebih
+dahulu. Jalankan `npx prisma db push` (atau migrasi Prisma pada pipeline Anda)
+sebelum deployment agar tabel `AuthToken` dan kolom `User.authVersion` tersedia.
 
 > Catatan: folder `prisma/migrations/` di-`.gitignore`, jadi kita memakai `prisma db push`
 > (bukan `prisma migrate deploy`). Konsekuensinya, setiap perubahan schema harus di-`db push`
@@ -168,5 +175,3 @@ Aplikasi ini menulis error internal NextAuth ke log Vercel (lihat konfigurasi
 `logger` di `src/lib/auth.ts`), jadi periksa **Vercel → Deployment → Functions →
 Logs** untuk pesan `NextAuth error` yang menyertakan `code` (mis.
 `OAUTH_CALLBACK_ERROR`, `OAUTH_CALLBACK_HANDLER_ERROR`) sebagai petunjuk pasti.
-
-

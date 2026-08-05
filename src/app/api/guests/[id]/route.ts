@@ -2,6 +2,8 @@
 import { prisma } from "@/lib/prisma";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
+import { activeWeddingWhere } from "@/lib/public-wedding";
+import { checkRateLimit, getRateLimitIdentifier } from "@/lib/rate-limit";
 
 export async function GET(req: Request, { params }: { params: { id: string } }) {
   try {
@@ -24,30 +26,35 @@ export async function GET(req: Request, { params }: { params: { id: string } }) 
       return NextResponse.json(guest);
     }
 
-    // Akses publik: verifikasi tamu benar-benar milik undangan yang dibuka
-    // (bila `weddingId`/`weddingSlug` disertakan) agar slug tamu dari undangan
-    // lain tidak bisa dipakai membuka undangan ini.
+    const rateLimit = checkRateLimit(getRateLimitIdentifier(req, "guest-lookup"), {
+      windowMs: 60_000,
+      max: 30,
+    });
+    if (rateLimit.limited) {
+      return NextResponse.json({ error: "Terlalu banyak permintaan" }, { status: 429 });
+    }
+
     const url = new URL(req.url);
     const weddingId = url.searchParams.get("weddingId");
     const weddingSlug = url.searchParams.get("weddingSlug");
 
+    if (!weddingId && !weddingSlug) {
+      return NextResponse.json({ error: "Konteks undangan wajib disertakan" }, { status: 400 });
+    }
+
     const guest = await prisma.guest.findFirst({
-      where: { slug: idOrSlug },
-      include: { wedding: { select: { id: true, slug: true } } },
+      where: {
+        slug: idOrSlug,
+        wedding: activeWeddingWhere(weddingId || weddingSlug || ""),
+      },
+      select: { id: true, name: true, phone: true },
     });
 
     if (!guest) {
       return NextResponse.json({ error: "Tamu tidak ditemukan" }, { status: 404 });
     }
 
-    if (
-      (weddingId && guest.wedding.id !== weddingId) ||
-      (weddingSlug && guest.wedding.slug !== weddingSlug)
-    ) {
-      return NextResponse.json({ error: "Tamu tidak ditemukan" }, { status: 404 });
-    }
-
-    return NextResponse.json({ id: guest.id, name: guest.name, phone: guest.phone });
+    return NextResponse.json(guest, { headers: { "Cache-Control": "no-store" } });
 
   } catch (error) {
     console.error("Guest fetch error:", error);

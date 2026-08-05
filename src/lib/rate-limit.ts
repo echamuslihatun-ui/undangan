@@ -1,75 +1,75 @@
+import type { NextRequest } from "next/server";
+
 /**
- * Rate limiting sederhana menggunakan Map in-memory.
- * Untuk production dengan banyak pengguna, gunakan Redis.
+ * Simple in-memory rate limiter
+ * Note: In production, consider using a distributed store like Redis
  */
 
-interface RateLimitEntry {
-  count: number;
-  resetAt: number;
-}
-
+type RateLimitEntry = { count: number; resetTime: number };
 const store = new Map<string, RateLimitEntry>();
-
-// Bersihkan entry yang expired setiap 5 menit
-setInterval(() => {
-  const now = Date.now();
-  Array.from(store.entries()).forEach(([key, entry]) => {
-    if (entry.resetAt <= now) {
-      store.delete(key);
-    }
-  });
-}, 5 * 60 * 1000);
-
-interface RateLimitConfig {
-  windowMs: number; // Jendela waktu dalam milidetik
-  max: number; // Maksimal request dalam jendela waktu
-}
-
-const defaultConfig: RateLimitConfig = {
-  windowMs: 60 * 1000, // 1 menit
-  max: 20, // 20 request per menit
-};
+let checksSinceCleanup = 0;
 
 /**
- * Cek apakah request terbatas oleh rate limit.
- * Returns: { limited: boolean, remaining: number, resetIn: number }
+ * Get identifier for rate limiting based on request
+ */
+export function getRateLimitIdentifier(req: NextRequest | Request, type = "default"): string {
+  // Try to get IP address from headers
+  const forwardedFor = req.headers.get("x-forwarded-for");
+  const realIp = req.headers.get("x-real-ip");
+  const ip = forwardedFor?.split(",")[0]?.trim() || realIp || "unknown";
+
+  return `${type}:${ip}`;
+}
+
+/**
+ * Check if request is rate limited
  */
 export function checkRateLimit(
   identifier: string,
-  config: Partial<RateLimitConfig> = {}
-): { limited: boolean; remaining: number; resetIn: number } {
-  const { windowMs, max } = { ...defaultConfig, ...config };
+  options: { windowMs: number; max: number }
+): { limited: boolean; count: number; resetIn: number } {
   const now = Date.now();
-  const entry = store.get(identifier);
+  const windowMs = options.windowMs;
+  const max = options.max;
 
-  if (!entry || entry.resetAt <= now) {
-    // Buat entry baru
-    store.set(identifier, { count: 1, resetAt: now + windowMs });
-    return { limited: false, remaining: max - 1, resetIn: windowMs };
+  // Lazy cleanup works in serverless runtimes and does not keep Node alive with a timer.
+  checksSinceCleanup += 1;
+  if (checksSinceCleanup >= 100) {
+    cleanupRateLimitStore(now);
+    checksSinceCleanup = 0;
   }
 
-  entry.count += 1;
+  const entry = store.get(identifier);
 
-  if (entry.count > max) {
+  if (!entry || now > entry.resetTime) {
+    // New entry or window has expired
+    store.set(identifier, {
+      count: 1,
+      resetTime: now + windowMs,
+    });
+    return { limited: false, count: 1, resetIn: windowMs };
+  }
+
+  if (entry.count >= max) {
+    // Rate limited
     return {
       limited: true,
-      remaining: 0,
-      resetIn: entry.resetAt - now,
+      count: entry.count,
+      resetIn: entry.resetTime - now,
     };
   }
 
-  return {
-    limited: false,
-    remaining: max - entry.count,
-    resetIn: entry.resetAt - now,
-  };
+  // Increment count
+  entry.count += 1;
+  return { limited: false, count: entry.count, resetIn: entry.resetTime - now };
 }
 
 /**
- * Buat identifier dari IP address atau user ID
+ * Clear expired entries from the store
+ * Call periodically in production to prevent memory leak
  */
-export function getRateLimitIdentifier(req: Request, suffix?: string): string {
-  const forwarded = req.headers.get("x-forwarded-for");
-  const ip = forwarded?.split(",")[0]?.trim() || "unknown";
-  return `${ip}:${suffix || "default"}`;
+export function cleanupRateLimitStore(now = Date.now()): void {
+  store.forEach((entry, key) => {
+    if (entry.resetTime <= now) store.delete(key);
+  });
 }

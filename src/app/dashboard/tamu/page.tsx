@@ -1,9 +1,9 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import * as XLSX from "xlsx";
 import { UserPlus, Search, MessageCircle, Copy, Trash2, FileSpreadsheet, Send, CheckCircle, Clock, Download, Filter, ArrowUpDown } from "lucide-react";
 import { useToast } from "@/components/Toast";
+import { createCsv, parseCsv } from "@/lib/csv";
 
 type Guest = {
   id: string;
@@ -162,26 +162,27 @@ export default function TamuPage() {
     showToast("success", `${pending.length} undangan sedang dikirim`);
   };
 
-  // IMPORT EXCEL
+  // Import CSV tanpa parser spreadsheet pihak ketiga yang rentan.
   const handleFileImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
     setImporting(true);
     try {
-      const buffer = await file.arrayBuffer();
-      const workbook = XLSX.read(buffer, { type: "array" });
-      const sheet = workbook.Sheets[workbook.SheetNames[0]];
-      const data = XLSX.utils.sheet_to_json<{ Nama?: string; nama?: string; No?: string; Phone?: string; phone?: string; WhatsApp?: string; wa?: string }>(sheet);
+      if (file.size > 2 * 1024 * 1024) {
+        showToast("error", "Ukuran file CSV maksimal 2 MB");
+        return;
+      }
+      const data = parseCsv(await file.text());
 
-      const guestsData = data.map((row: any) => ({
+      const guestsData = data.map((row) => ({
         name: String(row.Nama || row.nama || row.Name || row.name || "").trim(),
         phone: String(row.No || row.Phone || row.phone || row.WhatsApp || row.wa || row.Telepon || row.telepon || "").trim(),
       }));
 
       const valid = guestsData.filter((g) => g.name && g.phone);
       if (valid.length === 0) {
-        showToast("error", "Tidak ada data valid. Pastikan kolom: Nama, No. WhatsApp");
+        showToast("error", "Tidak ada data valid. Pastikan CSV memiliki kolom Nama dan WhatsApp");
         return;
       }
 
@@ -201,14 +202,14 @@ export default function TamuPage() {
         showToast("error", "Gagal import data");
       }
     } catch (error) {
-      showToast("error", "Gagal membaca file Excel");
+      showToast("error", "Gagal membaca file CSV");
     } finally {
       setImporting(false);
       if (fileInputRef.current) fileInputRef.current.value = "";
     }
   };
 
-  // EXPORT EXCEL
+  // Export CSV dapat dibuka langsung di Excel/Google Sheets.
   const handleExport = () => {
     const exportData = guests.map((g) => ({
       Nama: g.name,
@@ -217,10 +218,13 @@ export default function TamuPage() {
       Link: buildGuestLink(g),
     }));
 
-    const ws = XLSX.utils.json_to_sheet(exportData);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Tamu");
-    XLSX.writeFile(wb, `daftar-tamu-${wedding?.partner1 || "undangan"}.xlsx`);
+    const blob = new Blob(["\uFEFF", createCsv(exportData)], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = `daftar-tamu-${wedding?.partner1 || "undangan"}.csv`;
+    anchor.click();
+    URL.revokeObjectURL(url);
     showToast("success", "Data tamu berhasil di-download");
   };
 
@@ -238,10 +242,10 @@ export default function TamuPage() {
         <div className="flex flex-wrap gap-2">
           <button onClick={() => setShowAdd(!showAdd)} disabled={!canManageGuests} className={`btn-secondary ${!canManageGuests ? "opacity-60 cursor-not-allowed" : ""}`}><UserPlus className="h-4 w-4" /> Tambah Tamu</button>
           <button onClick={() => fileInputRef.current?.click()} disabled={!canManageGuests || importing} className={`btn-secondary ${!canManageGuests ? "opacity-60 cursor-not-allowed" : ""}`}>
-            <FileSpreadsheet className="h-4 w-4" /> {importing ? "Importing..." : "Import Excel"}
+            <FileSpreadsheet className="h-4 w-4" /> {importing ? "Importing..." : "Import CSV"}
           </button>
-          <input ref={fileInputRef} type="file" accept=".xlsx,.xls" onChange={handleFileImport} className="hidden" />
-          <button onClick={handleExport} className="btn-secondary"><Download className="h-4 w-4" /> Export Excel</button>
+          <input ref={fileInputRef} type="file" accept=".csv,text/csv" onChange={handleFileImport} className="hidden" />
+          <button onClick={handleExport} className="btn-secondary"><Download className="h-4 w-4" /> Export CSV</button>
           <button onClick={handleSendAll} disabled={!canManageGuests} className={`btn-primary ${!canManageGuests ? "opacity-60 cursor-not-allowed" : ""}`}><Send className="h-4 w-4" /> Kirim Semua</button>
         </div>
       </div>

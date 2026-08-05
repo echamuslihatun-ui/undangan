@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import crypto from "crypto";
+import { checkRateLimit } from "@/lib/rate-limit";
 
 export const dynamic = "force-dynamic";
 
@@ -15,6 +16,10 @@ export async function POST(req: Request) {
     const session = await getServerSession(authOptions);
     if (!session) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+    const rateLimit = checkRateLimit(`upload:${session.user.id}`, { windowMs: 60_000, max: 10 });
+    if (rateLimit.limited) {
+      return NextResponse.json({ error: "Batas upload tercapai. Coba lagi sebentar." }, { status: 429 });
     }
 
     const cloudName = process.env.CLOUDINARY_CLOUD_NAME;
@@ -74,7 +79,11 @@ export async function POST(req: Request) {
 
     // `auto` mendukung gambar maupun audio (mp3)
     const uploadUrl = `https://api.cloudinary.com/v1_1/${cloudName}/auto/upload`;
-    const res = await fetch(uploadUrl, { method: "POST", body: uploadForm });
+    const res = await fetch(uploadUrl, {
+      method: "POST",
+      body: uploadForm,
+      signal: AbortSignal.timeout(30_000),
+    });
 
     const data = (await res.json().catch(() => null)) as
       | { secure_url?: string; error?: { message?: string } }

@@ -2,6 +2,10 @@ import { NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
 import { checkRateLimit, getRateLimitIdentifier } from "@/lib/rate-limit";
+import { AUTH_TOKEN_TYPES, createAuthToken, getAppUrl, isValidEmail, normalizeEmail, validatePassword } from "@/lib/account-security";
+import { createRandomCode, normalizeString } from "@/lib/input";
+import { sendAccountEmail } from "@/lib/email";
+import { logger } from "@/lib/logger";
 
 export async function POST(req: Request) {
   try {
@@ -15,7 +19,10 @@ export async function POST(req: Request) {
       );
     }
 
-    const { name, email, password } = await req.json();
+    const body = await req.json();
+    const name = normalizeString(body?.name, 100);
+    const email = normalizeEmail(body?.email);
+    const password = body?.password;
 
     if (!name || !email || !password) {
       return NextResponse.json(
@@ -24,15 +31,15 @@ export async function POST(req: Request) {
       );
     }
 
-    if (password.length < 8) {
+    const passwordError = validatePassword(password);
+    if (passwordError) {
       return NextResponse.json(
-        { error: "Password minimal 8 karakter" },
+        { error: passwordError },
         { status: 400 }
       );
     }
 
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email)) {
+    if (!isValidEmail(email)) {
       return NextResponse.json(
         { error: "Format email tidak valid" },
         { status: 400 }
@@ -51,29 +58,25 @@ export async function POST(req: Request) {
     }
 
     const hashedPassword = await bcrypt.hash(password, 12);
+    const { rawToken, tokenHash } = createAuthToken();
 
+    const baseSlug = `${name}-pasangan`.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
     const user = await prisma.user.create({
       data: {
-        name,
-        email,
-        password: hashedPassword,
+        name, email, password: hashedPassword,
+        wedding: { create: { partner1: name, partner2: "Pasangan", slug: `${baseSlug || "undangan"}-${createRandomCode(4)}` } },
+        authTokens: { create: { type: AUTH_TOKEN_TYPES.VERIFY_EMAIL, tokenHash, expiresAt: new Date(Date.now() + 24 * 60 * 60_000) } },
       },
     });
 
-    // Auto-create wedding data for new user
-    const baseSlug = `${name}-pasangan`.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
-    const randomCode = Math.random().toString(36).substring(2, 6);
-    await prisma.wedding.create({
-      data: {
-        userId: user.id,
-        partner1: name,
-        partner2: "Pasangan",
-        slug: `${baseSlug}-${randomCode}`,
-      },
-    });
+    try {
+      await sendAccountEmail(email, `${getAppUrl()}/verify-email?token=${encodeURIComponent(rawToken)}`, "verify");
+    } catch (error) {
+      logger.error("Registrasi berhasil tetapi email verifikasi gagal dikirim", error, { userId: user.id });
+    }
 
     return NextResponse.json(
-      { message: "Registrasi berhasil", userId: user.id },
+      { message: "Registrasi berhasil. Periksa email untuk verifikasi akun.", userId: user.id, requiresVerification: true },
       { status: 201 }
     );
   } catch (error) {

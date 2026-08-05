@@ -15,6 +15,13 @@ export async function POST(req: Request) {
     }
 
     const { order_id, transaction_status, payment_type, fraud_status, gross_amount } = body;
+    if (
+      typeof order_id !== "string" ||
+      typeof transaction_status !== "string" ||
+      typeof gross_amount !== "string"
+    ) {
+      return NextResponse.json({ error: "Invalid notification payload" }, { status: 400 });
+    }
 
     const mapped = mapMidtransStatusToOrderStatus(transaction_status, fraud_status);
 
@@ -29,7 +36,7 @@ export async function POST(req: Request) {
 
       // Midtrans mengirim gross_amount sebagai string desimal, mis. "250000.00".
       const paidAmount = Math.round(parseFloat(String(gross_amount)));
-      if (Number.isFinite(paidAmount) && paidAmount !== order.amount) {
+      if (!Number.isFinite(paidAmount) || paidAmount <= 0 || paidAmount !== order.amount) {
         console.error(
           `Webhook: gross_amount (${paidAmount}) tidak sama dengan order.amount (${order.amount}) untuk ${order_id}`
         );

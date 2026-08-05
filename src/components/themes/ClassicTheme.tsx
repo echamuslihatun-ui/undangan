@@ -6,7 +6,7 @@ import { motion, useScroll, useTransform } from "framer-motion";
 import type { Variants } from "framer-motion";
 import { Heart, Calendar, MapPin, Clock } from "lucide-react";
 import CountdownTimer from "@/components/CountdownTimer";
-import type { WeddingData } from "./types";
+import { themeArray, type BankAccount, type WeddingData } from "./types";
 
 const fadeUp: Variants = {
 
@@ -39,8 +39,8 @@ function dateLabel(value: string) {
 
 export default function ClassicTheme({ wedding }: { wedding: WeddingData }) {
   const eventDate = wedding.resepsiDate || wedding.akadDate;
-  const photos = Array.isArray(wedding.photos) ? wedding.photos : (wedding.photos ? JSON.parse(wedding.photos) : []);
-  const bankAccounts = Array.isArray(wedding.bankAccounts) ? wedding.bankAccounts : (wedding.bankAccounts ? JSON.parse(wedding.bankAccounts) : []);
+  const photos = themeArray<string>(wedding.photos);
+  const bankAccounts = themeArray<BankAccount>(wedding.bankAccounts);
   const { scrollY } = useScroll();
   const yParallax = useTransform(scrollY, [0, 600], [0, -150]);
   const audioRef = useRef<HTMLAudioElement>(null);

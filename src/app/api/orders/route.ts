@@ -4,9 +4,11 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { createSnapTransaction, SNAP_TOKEN_TTL_HOURS } from "@/lib/midtrans";
 import { getPackage } from "@/lib/packages";
+import { checkRateLimit } from "@/lib/rate-limit";
 
 
 export const dynamic = "force-dynamic";
+const PAYMENT_METHODS = ["qris", "transfer", "ewallet"] as const;
 
 export async function GET() {
   try {
@@ -38,6 +40,13 @@ export async function POST(req: Request) {
 
     const userId = session.user.id;
     const { templateId, packageName, method } = await req.json();
+    if (!PAYMENT_METHODS.includes(method)) {
+      return NextResponse.json({ error: "Metode pembayaran tidak valid" }, { status: 400 });
+    }
+    const rateLimit = checkRateLimit(`order-create:${userId}`, { windowMs: 60_000, max: 3 });
+    if (rateLimit.limited) {
+      return NextResponse.json({ error: "Terlalu banyak percobaan pembayaran" }, { status: 429 });
+    }
 
     // Harga TIDAK diambil dari client. Nilai `amount` dari body diabaikan
     // supaya tidak bisa dimanipulasi (mis. mengirim amount: 1). Harga dan masa
@@ -46,11 +55,28 @@ export async function POST(req: Request) {
     const grossAmount = selectedPackage.price;
 
     const template = templateId
-      ? await prisma.template.findUnique({ where: { id: templateId } })
+      ? await prisma.template.findFirst({ where: { id: templateId, status: "active" } })
       : await prisma.template.findFirst({ where: { status: "active" }, orderBy: { createdAt: "desc" } });
 
     if (!template) {
       return NextResponse.json({ error: "Template aktif belum tersedia" }, { status: 400 });
+    }
+
+    const recentPending = await prisma.order.findFirst({
+      where: {
+        userId,
+        templateId: template.id,
+        packageName: selectedPackage.name,
+        method,
+        status: "pending",
+        createdAt: { gt: new Date(Date.now() - 5 * 60_000) },
+        snapRedirectUrl: { not: null },
+      },
+      include: { template: true },
+      orderBy: { createdAt: "desc" },
+    });
+    if (recentPending?.snapRedirectUrl) {
+      return NextResponse.json({ ...recentPending, redirectUrl: recentPending.snapRedirectUrl });
     }
 
     const order = await prisma.order.create({

@@ -5,13 +5,14 @@ import { authOptions } from "@/lib/auth";
 import { isValidPackage } from "@/lib/packages";
 import { reconcileWeddingActivation } from "@/lib/orders";
 import bcrypt from "bcryptjs";
+import { validatePassword } from "@/lib/account-security";
 
 export const dynamic = "force-dynamic";
 
 export async function GET() {
   try {
     const session = await getServerSession(authOptions);
-    if (!session) {
+    if (!session?.user?.id) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
@@ -87,7 +88,7 @@ export async function GET() {
 export async function PUT(req: Request) {
   try {
     const session = await getServerSession(authOptions);
-    if (!session) {
+    if (!session?.user?.id) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
@@ -107,8 +108,9 @@ export async function PUT(req: Request) {
 
     // Update password
     if (currentPassword && newPassword) {
-      if (newPassword.length < 8) {
-        return NextResponse.json({ error: "Password baru minimal 8 karakter" }, { status: 400 });
+      const passwordError = validatePassword(newPassword);
+      if (passwordError) {
+        return NextResponse.json({ error: passwordError }, { status: 400 });
       }
 
       const user = await prisma.user.findUnique({
@@ -126,6 +128,7 @@ export async function PUT(req: Request) {
       }
 
       updateData.password = await bcrypt.hash(newPassword, 12);
+      updateData.authVersion = { increment: 1 };
     }
 
     if (Object.keys(updateData).length === 0) {
