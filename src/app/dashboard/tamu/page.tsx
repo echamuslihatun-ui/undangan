@@ -136,7 +136,7 @@ export default function TamuPage() {
     });
   };
 
-  const handleSendWA = (guest: Guest) => {
+  const handleSendWA = async (guest: Guest) => {
     if (!canManageGuests) {
       showToast("error", "Kirim undangan akan aktif setelah pembayaran berhasil.");
       return;
@@ -145,10 +145,25 @@ export default function TamuPage() {
     const dateText = wedding?.resepsiDate ? new Date(wedding.resepsiDate).toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" }) : "Tanggal menyusul";
     const text = `Kepada Yth.\n${guest.name}\n\nDengan memohon rahmat Allah SWT, kami mengundang untuk menghadiri acara pernikahan kami:\n\n${wedding?.partner1 || "Mempelai"} & ${wedding?.partner2 || "Pasangan"}\n${dateText}\n${wedding?.location || "Lokasi menyusul"}\n\nLink undangan: ${link}\n\nMerupakan suatu kehormatan bagi kami atas kehadiran dan doa restu Anda.`;
     window.open(`https://wa.me/${guest.phone}?text=${encodeURIComponent(text)}`, "_blank");
-    setGuests(guests.map((g) => g.id === guest.id ? { ...g, status: "sent" as const } : g));
+
+    // Simpan status "sent" ke database agar tidak hilang saat halaman di-refresh.
+    try {
+      const res = await fetch(`/api/guests/${guest.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: "sent" }),
+      });
+      if (res.ok) {
+        setGuests(guests.map((g) => g.id === guest.id ? { ...g, status: "sent" as const } : g));
+      } else {
+        console.error("Gagal menyimpan status tamu:", guest.id);
+      }
+    } catch (error) {
+      console.error("Gagal menyimpan status tamu:", error);
+    }
   };
 
-  const handleSendAll = () => {
+  const handleSendAll = async () => {
     if (!canManageGuests) {
       showToast("error", "Kiriman undangan akan aktif setelah pembayaran berhasil.");
       return;
@@ -158,7 +173,10 @@ export default function TamuPage() {
       showToast("info", "Semua tamu sudah dikirim undangan");
       return;
     }
-    pending.forEach((g) => handleSendWA(g));
+    // Buka semua tab WhatsApp sekaligus, lalu simpan status "sent" ke database
+    // untuk setiap tamu. `Promise.allSettled` memastikan semua request selesai
+    // meskipun salah satu gagal.
+    await Promise.allSettled(pending.map((g) => handleSendWA(g)));
     showToast("success", `${pending.length} undangan sedang dikirim`);
   };
 

@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { verifyMidtransNotification, mapMidtransStatusToOrderStatus } from "@/lib/midtrans";
 import { markOrderPaid, markOrderFailed } from "@/lib/orders";
+import { sendTransactionalEmail } from "@/lib/email";
+import { logger } from "@/lib/logger";
 
 export async function POST(req: Request) {
   try {
@@ -44,6 +46,24 @@ export async function POST(req: Request) {
       }
 
       await markOrderPaid(order_id, payment_type);
+
+      // Kirim notifikasi email ke user bahwa pembayaran berhasil.
+      // Gagal mengirim email TIDAK menggagalkan webhook — hanya dicatat di log.
+      try {
+        const user = await prisma.user.findUnique({
+          where: { id: order.userId },
+          select: { email: true, name: true },
+        });
+        if (user?.email) {
+          await sendTransactionalEmail(user.email, "payment_success", {
+            name: user.name || undefined,
+            detail: `Paket ${order.packageName} — Rp ${order.amount.toLocaleString("id-ID")}`,
+          });
+        }
+      } catch (emailError) {
+        logger.error("Gagal mengirim email notifikasi pembayaran", emailError, { order_id });
+      }
+
       return NextResponse.json({ message: "Webhook processed: order activated" });
     }
 

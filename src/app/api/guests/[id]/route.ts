@@ -62,6 +62,42 @@ export async function GET(req: Request, { params }: { params: { id: string } }) 
   }
 }
 
+export async function PATCH(req: Request, { params }: { params: { id: string } }) {
+  try {
+    const session = await getServerSession(authOptions);
+    if (!session) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const userId = session.user.id;
+    const body = await req.json().catch(() => null);
+    const status = body?.status;
+
+    // Hanya izinkan status yang dikenal.
+    if (!["pending", "sent", "confirmed"].includes(status)) {
+      return NextResponse.json({ error: "Status tidak valid" }, { status: 400 });
+    }
+
+    const guest = await prisma.guest.findFirst({
+      where: { id: params.id, wedding: { userId } },
+    });
+
+    if (!guest) {
+      return NextResponse.json({ error: "Tamu tidak ditemukan" }, { status: 404 });
+    }
+
+    const updated = await prisma.guest.update({
+      where: { id: guest.id },
+      data: { status },
+    });
+
+    return NextResponse.json(updated);
+  } catch (error) {
+    console.error("Guest update error:", error);
+    return NextResponse.json({ error: "Gagal mengubah status tamu" }, { status: 500 });
+  }
+}
+
 export async function DELETE(req: Request, { params }: { params: { id: string } }) {
   try {
     const session = await getServerSession(authOptions);

@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#fdf6ec"/>
+      <stop offset="100%" style="stop-color:#f5e6d3"/>
+    </linearGradient>
+    <linearGradient id="ring" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#d4af37"/>
+      <stop offset="100%" style="stop-color:#b8952e"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Latar belakang -->
+  <rect width="512" height="512" rx="96" fill="url(#bg)"/>
+
+  <!-- Cincin kawin -->
+  <circle cx="200" cy="256" r="80" fill="none" stroke="url(#ring)" stroke-width="24"/>
+  <circle cx="312" cy="256" r="80" fill="none" stroke="url(#ring)" stroke-width="24"/>
+
+  <!-- Intan di tengah -->
+  <path d="M256 180 L292 220 L256 336 L220 220 Z" fill="#b9a0d8" opacity="0"/>
+
+  <!-- Hati di tengah cincin -->
+  <path d="M256 230
+           C 240 210, 210 220, 210 246
+           C 210 268, 240 290, 256 304
+           C 272 290, 302 268, 302 246
+           C 302 220, 272 210, 256 230 Z"
+        fill="#d4587a"/>
+
+  <!-- Teks U -->
+  <text x="256" y="440" text-anchor="middle" font-family="Georgia, serif" font-size="56" fill="#8b7355" font-weight="bold">U</text>
+</svg>

@@ -7,6 +7,7 @@ import {
   Cormorant_Garamond,
 } from "next/font/google";
 import { initEnvironment } from "@/lib/env";
+import ServiceWorkerRegister from "@/components/ServiceWorkerRegister";
 import "./globals.css";
 
 // Initialize environment validation (server-side only)
@@ -36,6 +37,20 @@ export const metadata: Metadata = {
     "Buat undangan pernikahan digital yang elegan. Pilih template, kustomisasi, bayar, dan sebar undangan via WhatsApp.",
   keywords: ["undangan online", "undangan pernikahan digital", "undangan website", "wedding invitation", "undanganku"],
   authors: [{ name: "Undanganku" }],
+  applicationName: "Undanganku",
+  manifest: "/manifest.webmanifest",
+  appleWebApp: {
+    capable: true,
+    title: "Undanganku",
+    statusBarStyle: "default",
+  },
+  formatDetection: {
+    telephone: false,
+  },
+  icons: {
+    icon: "/icon.svg",
+    apple: "/icon.svg",
+  },
   openGraph: {
     title: "Undanganku - Platform Undangan Online Pernikahan",
     description:
@@ -67,7 +82,10 @@ export default function RootLayout({
       lang="id"
       className={`${inter.variable} ${playfair.variable} ${greatVibes.variable} ${cormorant.variable}`}
     >
-      <body className="font-sans antialiased">{children}</body>
+      <body className="font-sans antialiased">
+        {children}
+        <ServiceWorkerRegister />
+      </body>
     </html>
   );
 }

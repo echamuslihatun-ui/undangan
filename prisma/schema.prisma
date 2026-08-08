@@ -141,13 +141,16 @@ model Wedding {
   instagram1   String?
   instagram2   String?
   storyEnabled Boolean   @default(false)
-  story        String    @default("[]")
-  photos       String    @default("[]")
+  // JSONB: story, photos, dan bankAccounts disimpan sebagai array JSON asli
+  // (bukan string JSON) agar bisa di-query dengan operator PostgreSQL dan
+  // tidak perlu di-parse manual di aplikasi.
+  story        Json      @default("[]")
+  photos       Json      @default("[]")
   musicUrl     String?
   bankName     String?
   bankAccount  String?
   bankHolder   String?
-  bankAccounts String    @default("[]")
+  bankAccounts Json      @default("[]")
   qrisImage    String?
   customDomain String?
   themeKey     String    @default("classic") // classic | modern

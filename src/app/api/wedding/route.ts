@@ -7,6 +7,7 @@ import {
   createRandomCode,
   normalizeString,
   optionalHttpUrl,
+  optionalInstagram,
   optionalString,
   parseOptionalDate,
 } from "@/lib/input";
@@ -110,18 +111,22 @@ export async function PUT(req: Request) {
       quoteImage: body.quoteImage,
       photoPria: body.photoPria,
       photoWanita: body.photoWanita,
-      instagram1: body.instagram1,
-      instagram2: body.instagram2,
+      // Validasi & normalisasi URL Instagram: hanya username yang disimpan
+      // (bukan URL penuh), dan URL asing ditolak demi keamanan render.
+      instagram1: optionalInstagram(body.instagram1),
+      instagram2: optionalInstagram(body.instagram2),
       // Section cerita cinta ditentukan murni oleh ada/tidaknya item cerita:
       // bila daftar dikosongkan, section otomatis tidak tampil di undangan.
       storyEnabled: story.length > 0,
-      story: JSON.stringify(story),
-      photos: JSON.stringify(photos),
+      // JSONB: simpan array langsung (bukan string JSON) agar bisa di-query
+      // dengan operator PostgreSQL dan tidak perlu di-parse manual.
+      story: story,
+      photos: photos,
       musicUrl: optionalHttpUrl(body.musicUrl),
       bankName: optionalString(body.bankName, 100),
       bankAccount: optionalString(body.bankAccount, 100),
       bankHolder: optionalString(body.bankHolder, 100),
-      bankAccounts: JSON.stringify(bankAccounts),
+      bankAccounts: bankAccounts,
       qrisImage: optionalHttpUrl(body.qrisImage),
       customDomain: optionalString(body.customDomain, 253)?.toLowerCase() ?? null,
     };

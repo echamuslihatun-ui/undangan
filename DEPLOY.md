@@ -81,12 +81,24 @@ Buat file `.env.local` berisi `DATABASE_URL` dan `DIRECT_URL` yang menunjuk ke S
 lalu jalankan:
 
 ```bash
-# Sinkronkan skema Prisma ke Postgres
-npx prisma db push
+# Preview perubahan schema. Exit code 0 = sinkron, 2 = ada perbedaan.
+npm run db:check
+
+# Terapkan hanya setelah memastikan perubahan tidak destruktif.
+npm run db:sync
 
 # Buat akun admin awal
 npm run seed:admin
 ```
+
+`db:check` membandingkan database pada datasource dengan `prisma/schema.prisma`
+tanpa mengubah data. Jalankan sebelum setiap deploy yang mengubah schema dan
+jalankan kembali setelah `db:sync`; pemeriksaan kedua harus selesai dengan exit
+code `0` dan pesan bahwa tidak ada perbedaan.
+
+Jangan gunakan `--accept-data-loss` atau `--force-reset` di production. Bila
+Prisma mendeteksi perubahan destruktif, hentikan proses dan siapkan migrasi data
+secara eksplisit.
 
 `RESEND_API_KEY` dan `EMAIL_FROM` diperlukan untuk verifikasi akun credentials
 serta reset password. Verifikasi domain pengirim di dashboard Resend terlebih
@@ -162,9 +174,12 @@ Cek berurutan dari yang paling sering:
 3. **Authorized redirect URI di Google Cloud Console** harus memuat persis:
    `https://<domain>/api/auth/callback/google`
    dan Authorized JavaScript origins: `https://<domain>`.
-4. **Skema database sudah di-`prisma db push` ke Supabase.** Karena memakai
+4. **Skema database sudah disinkronkan ke Supabase** (`npm run db:check` harus
+   exit code `0`). Karena memakai
    `PrismaAdapter`, login Google menulis ke tabel `User`, `Account`, `Session`.
-   Bila tabel belum ada, adapter melempar error dan login gagal.
+   Bila tabel atau kolom belum ada, adapter melempar error dan login gagal.
+   Contoh `The column User.authVersion does not exist` berarti kode sudah memakai
+   schema baru tetapi production belum menjalankan `npm run db:sync`.
 5. **Env var Google benar & tidak tertukar** (`GOOGLE_CLIENT_ID` /
    `GOOGLE_CLIENT_SECRET`), untuk OAuth client yang sama dengan redirect URI di
    atas.

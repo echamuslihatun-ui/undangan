@@ -6,6 +6,7 @@ import { prisma } from "@/lib/prisma";
 import { logger } from "@/lib/logger";
 import bcrypt from "bcryptjs";
 import { normalizeEmail } from "@/lib/account-security";
+import type { User } from "@prisma/client";
 
 // Pesan generik untuk klien. Alasan kegagalan yang sebenarnya hanya masuk log
 // server, supaya tidak membocorkan email mana yang terdaftar.
@@ -53,7 +54,7 @@ export const authOptions: NextAuthOptions = {
           throw new Error("Email dan password diperlukan");
         }
 
-        let user: any;
+        let user: (Pick<User, "id" | "email" | "name" | "image" | "password" | "role" | "status"> & { emailVerified: Date | null; authVersion: number }) | null;
         try {
           user = await prisma.user.findUnique({
             where: { email: normalizeEmail(credentials.email) },
@@ -153,16 +154,16 @@ export const authOptions: NextAuthOptions = {
 
         const dbUser = await prisma.user.findUnique({
           where: { id: user.id },
-          select: { role: true, status: true, authVersion: true } as any,
-        }) as any;
-        token.role = dbUser?.role ?? (user as any).role ?? "customer";
-        token.status = dbUser?.status ?? (user as any).status ?? "active";
-        token.authVersion = dbUser?.authVersion ?? (user as any).authVersion ?? 0;
+          select: { role: true, status: true, authVersion: true },
+        });
+        token.role = dbUser?.role ?? user.role ?? "customer";
+        token.status = dbUser?.status ?? user.status ?? "active";
+        token.authVersion = dbUser?.authVersion ?? user.authVersion ?? 0;
       } else if (token.id) {
         const dbUser = await prisma.user.findUnique({
-          where: { id: token.id as string },
-          select: { role: true, status: true, authVersion: true } as any,
-        }) as any;
+          where: { id: token.id },
+          select: { role: true, status: true, authVersion: true },
+        });
         if (dbUser && dbUser.authVersion === token.authVersion) {
           token.role = dbUser.role;
           token.status = dbUser.status;
@@ -174,9 +175,9 @@ export const authOptions: NextAuthOptions = {
     },
     async session({ session, token }) {
       if (session.user && token.id) {
-        session.user.id = token.id as string;
-        session.user.role = token.role as string;
-        session.user.status = token.status as string;
+        session.user.id = token.id;
+        session.user.role = token.role;
+        session.user.status = token.status;
       } else if (session.user) {
         // Membuat middleware/getServerSession memperlakukan JWT yang dicabut
         // sebagai sesi tanpa identitas pengguna.

@@ -48,8 +48,13 @@ export async function GET(req: Request, { params }: { params: { id: string } }) 
     const { userId, customDomain, ...publicWedding } = wedding;
     void userId;
     void customDomain;
+
+    // `private` (bukan `public`) karena response berisi data tamu spesifik
+    // (nama & telepon) — cache hanya boleh disimpan di browser pengguna,
+    // tidak di CDN bersama. `max-age=60` meredam beban database untuk tamu
+    // yang membuka ulang undangan beberapa kali tanpa data basi yang nyata.
     return NextResponse.json({ wedding: publicWedding, guest }, {
-      headers: { "Cache-Control": "private, no-store" },
+      headers: { "Cache-Control": "private, max-age=60" },
     });
   } catch (error) {
     console.error("Public wedding fetch error:", error);

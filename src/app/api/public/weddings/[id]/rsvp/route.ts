@@ -3,6 +3,8 @@ import { prisma } from "@/lib/prisma";
 import { checkRateLimit, getRateLimitIdentifier } from "@/lib/rate-limit";
 import { Prisma } from "@prisma/client";
 import { activeWeddingWhere, isRsvpStatus, normalizeText } from "@/lib/public-wedding";
+import { sendTransactionalEmail } from "@/lib/email";
+import { logger } from "@/lib/logger";
 
 export const dynamic = "force-dynamic";
 
@@ -88,6 +90,23 @@ export async function POST(req: Request, { params }: { params: { id: string } })
       });
       return created;
     });
+
+    // Kirim notifikasi email ke pemilik undangan bahwa ada RSVP baru.
+    // Gagal mengirim email TIDAK menggagalkan RSVP — hanya dicatat di log.
+    try {
+      const owner = await prisma.user.findUnique({
+        where: { id: wedding.userId },
+        select: { email: true, name: true },
+      });
+      if (owner?.email) {
+        await sendTransactionalEmail(owner.email, "new_rsvp", {
+          name: guest.name,
+          detail: `${attendanceStatus === "confirmed" ? "Hadir" : "Tidak hadir"} — ${safeNumberOfGuests} tamu`,
+        });
+      }
+    } catch (emailError) {
+      logger.error("Gagal mengirim email notifikasi RSVP", emailError, { weddingId: wedding.id });
+    }
 
     return NextResponse.json(rsvp, { status: 201 });
 
