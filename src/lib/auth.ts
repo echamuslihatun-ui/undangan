@@ -42,6 +42,10 @@ export const authOptions: NextAuthOptions = {
     GoogleProvider({
       clientId: process.env.GOOGLE_CLIENT_ID || "",
       clientSecret: process.env.GOOGLE_CLIENT_SECRET || "",
+      // Izinkan akun Google untuk di-link ke akun credentials yang sudah ada
+      // dengan email yang sama. Aman karena Google sudah memverifikasi email.
+      // Error OAuthAccountNotLinked akan muncul jika opsi ini tidak ada.
+      allowDangerousEmailAccountLinking: true,
     }),
     CredentialsProvider({
       name: "credentials",
