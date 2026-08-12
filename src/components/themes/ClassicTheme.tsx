@@ -1,11 +1,12 @@
 "use client";
 
-import { useEffect, useRef } from "react";
 import Image from "next/image";
 import { motion, useScroll, useTransform } from "framer-motion";
 import type { Variants } from "framer-motion";
 import { Heart, Calendar, MapPin, Clock } from "lucide-react";
 import CountdownTimer from "@/components/CountdownTimer";
+import MusicToggle from "@/components/MusicToggle";
+import LiveStreamSection from "@/components/LiveStreamSection";
 import { themeArray, type BankAccount, type WeddingData } from "./types";
 
 const fadeUp: Variants = {
@@ -43,7 +44,6 @@ export default function ClassicTheme({ wedding }: { wedding: WeddingData }) {
   const bankAccounts = themeArray<BankAccount>(wedding.bankAccounts);
   const { scrollY } = useScroll();
   const yParallax = useTransform(scrollY, [0, 600], [0, -150]);
-  const audioRef = useRef<HTMLAudioElement>(null);
   // Cover mengikuti pengaturan dashboard; galeri lalu gambar contoh sebagai cadangan.
   const coverImage = wedding.heroImage || photos[0] || COVER_FALLBACK;
   const akadTime = eventTimeLabel(wedding.akadStart, wedding.akadEnd);
@@ -54,16 +54,9 @@ export default function ClassicTheme({ wedding }: { wedding: WeddingData }) {
   const showGeneralLocation =
     !!wedding.location && !wedding.akadVenue && !wedding.resepsiVenue;
 
-  useEffect(() => {
-    if (wedding.musicUrl && audioRef.current) {
-      audioRef.current.play().catch(() => {
-        // Autoplay blocked, user needs to interact first
-      });
-    }
-  }, [wedding.musicUrl]);
-
   return (
     <div className="overflow-hidden rounded-2xl bg-[#fdf8f0] shadow-xl font-serif">
+      <MusicToggle musicUrl={wedding.musicUrl} />
       {/* Cover dengan Parallax Effect */}
       <motion.div style={{ y: yParallax }} className="relative aspect-[3/4] overflow-hidden">
         <Image
@@ -312,12 +305,8 @@ export default function ClassicTheme({ wedding }: { wedding: WeddingData }) {
         </motion.div>
       )}
 
-      {/* Musik Background - Autoplay Hidden */}
-      {wedding.musicUrl && (
-        <div className="hidden">
-          <audio ref={audioRef} src={wedding.musicUrl} autoPlay loop />
-        </div>
-      )}
+      {/* Live Streaming */}
+      <LiveStreamSection liveStreamUrl={wedding.liveStreamUrl} />
 
       {/* Pesan */}
       {wedding.message && (

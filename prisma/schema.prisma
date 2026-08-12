@@ -152,6 +152,7 @@ model Wedding {
   bankHolder   String?
   bankAccounts Json      @default("[]")
   qrisImage    String?
+  liveStreamUrl String? // URL embed YouTube/Zoom/Instagram Live
   customDomain String?
   themeKey     String    @default("classic") // classic | modern
   slug         String    @unique // Short URL: /u/nama-mempelai-kode

@@ -12,19 +12,20 @@ export const dynamic = "force-dynamic";
  * Berguna sebagai jaring pengaman bila notifikasi webhook tidak sampai,
  * termasuk saat pengembangan lokal tanpa tunnel publik.
  */
-export async function GET(_req: Request, { params }: { params: { id: string } }) {
+export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     const session = await getServerSession(authOptions);
     if (!session) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
+    const { id } = await params;
     const userId = session.user.id;
 
     // Wajib: pastikan order milik user yang login, supaya ID order milik
     // orang lain tidak bisa diintip hanya dengan menebak-nebak.
     const order = await prisma.order.findFirst({
-      where: { id: params.id, userId },
+      where: { id, userId },
     });
 
     if (!order) {

@@ -8,8 +8,10 @@ import { logger } from "@/lib/logger";
 
 export const dynamic = "force-dynamic";
 
-export async function POST(req: Request, { params }: { params: { id: string } }) {
+export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const { id } = await params;
+
     // Rate limit: 10 RSVP per menit per IP
     const identifier = getRateLimitIdentifier(req, "rsvp");
     const rateLimit = checkRateLimit(identifier, { windowMs: 60 * 1000, max: 10 });
@@ -48,7 +50,7 @@ export async function POST(req: Request, { params }: { params: { id: string } })
     }
 
     const wedding = await prisma.wedding.findFirst({
-      where: activeWeddingWhere(params.id),
+      where: activeWeddingWhere(id),
       select: { id: true, userId: true },
     });
 

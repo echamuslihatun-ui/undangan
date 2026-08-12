@@ -5,8 +5,9 @@ import { checkRateLimit, getRateLimitIdentifier } from "@/lib/rate-limit";
 
 export const dynamic = "force-dynamic";
 
-export async function GET(req: Request, { params }: { params: { id: string } }) {
+export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const { id } = await params;
     const rateLimit = checkRateLimit(getRateLimitIdentifier(req, "public-wedding"), {
       windowMs: 60_000,
       max: 30,
@@ -21,7 +22,7 @@ export async function GET(req: Request, { params }: { params: { id: string } }) 
     }
 
     const wedding = await prisma.wedding.findFirst({
-      where: activeWeddingWhere(params.id),
+      where: activeWeddingWhere(id),
       include: {
         photoAlbum: { orderBy: [{ order: "asc" }, { createdAt: "desc" }] },
         messages: {

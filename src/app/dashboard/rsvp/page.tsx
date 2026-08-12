@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Users, CheckCircle, Clock, XCircle, Mail, Phone, MessageSquare } from "lucide-react";
+import { Users, CheckCircle, Clock, XCircle, Mail, Phone, MessageSquare, Download, MessageCircle } from "lucide-react";
 
 type RSVP = {
   id: string;
@@ -52,9 +52,19 @@ export default function RSVPPage() {
 
   return (
     <div>
-      <div className="mb-6">
-        <h1 className="font-serif text-2xl font-bold md:text-3xl">RSVP Tamu</h1>
-        <p className="mt-1 text-muted-foreground">Kelola konfirmasi kehadiran tamu undangan.</p>
+      <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h1 className="font-serif text-2xl font-bold md:text-3xl">RSVP Tamu</h1>
+          <p className="mt-1 text-muted-foreground">Kelola konfirmasi kehadiran tamu undangan.</p>
+        </div>
+        <div className="flex gap-2">
+          <a href="/api/rsvp/export" download className="btn-secondary text-sm">
+            <Download className="h-4 w-4" /> Export RSVP
+          </a>
+          <a href="/api/messages/export" download className="btn-secondary text-sm">
+            <MessageCircle className="h-4 w-4" /> Export Buku Tamu
+          </a>
+        </div>
       </div>
 
       <div className="mb-6 grid grid-cols-2 gap-4 sm:grid-cols-5">

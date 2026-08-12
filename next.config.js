@@ -11,9 +11,7 @@ const nextConfig = {
     ],
   },
   // Diperlukan untuk NextAuth v4 di Next.js 16+ (server components)
-  experimental: {
-    serverComponentsExternalPackages: ["next-auth"],
-  },
+  serverExternalPackages: ["next-auth"],
 };
 
 module.exports = nextConfig;

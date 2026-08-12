@@ -84,6 +84,7 @@ export type WeddingData = {
   bankHolder?: string | null;
   bankAccounts?: BankAccount[] | string | null;
   qrisImage?: string | null;
+  liveStreamUrl?: string | null;
   themeKey?: string;
 };
 

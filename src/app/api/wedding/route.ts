@@ -128,6 +128,7 @@ export async function PUT(req: Request) {
       bankHolder: optionalString(body.bankHolder, 100),
       bankAccounts: bankAccounts,
       qrisImage: optionalHttpUrl(body.qrisImage),
+      liveStreamUrl: optionalHttpUrl(body.liveStreamUrl),
       customDomain: optionalString(body.customDomain, 253)?.toLowerCase() ?? null,
     };
 

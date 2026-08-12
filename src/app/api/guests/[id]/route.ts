@@ -5,9 +5,9 @@ import { authOptions } from "@/lib/auth";
 import { activeWeddingWhere } from "@/lib/public-wedding";
 import { checkRateLimit, getRateLimitIdentifier } from "@/lib/rate-limit";
 
-export async function GET(req: Request, { params }: { params: { id: string } }) {
+export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
-    const idOrSlug = params.id;
+    const { id: idOrSlug } = await params;
     const session = await getServerSession(authOptions);
 
     if (session) {
@@ -62,13 +62,14 @@ export async function GET(req: Request, { params }: { params: { id: string } }) 
   }
 }
 
-export async function PATCH(req: Request, { params }: { params: { id: string } }) {
+export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     const session = await getServerSession(authOptions);
     if (!session) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
+    const { id } = await params;
     const userId = session.user.id;
     const body = await req.json().catch(() => null);
     const status = body?.status;
@@ -79,7 +80,7 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
     }
 
     const guest = await prisma.guest.findFirst({
-      where: { id: params.id, wedding: { userId } },
+      where: { id, wedding: { userId } },
     });
 
     if (!guest) {
@@ -98,13 +99,14 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
   }
 }
 
-export async function DELETE(req: Request, { params }: { params: { id: string } }) {
+export async function DELETE(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     const session = await getServerSession(authOptions);
     if (!session) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
+    const { id } = await params;
     const userId = session.user.id;
     const wedding = await prisma.wedding.findUnique({
       where: { userId },
@@ -115,7 +117,7 @@ export async function DELETE(req: Request, { params }: { params: { id: string } 
     }
 
     const guest = await prisma.guest.findFirst({
-      where: { id: params.id, wedding: { userId } },
+      where: { id, wedding: { userId } },
     });
 
     if (!guest) {

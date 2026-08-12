@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import Image from "next/image";
-import { Heart, Music, QrCode, Upload, Save, Calendar, MapPin, User, Trash2, X, ImagePlus, Eye, Clock, Plus, Sparkles, Quote } from "lucide-react";
+import { Heart, Music, QrCode, Upload, Save, Calendar, MapPin, User, Trash2, X, ImagePlus, Eye, Clock, Plus, Sparkles, Quote, Video } from "lucide-react";
 import { useToast } from "@/components/Toast";
 
 type Tab = "template" | "acara" | "media" | "cerita" | "amplop";
@@ -88,6 +88,7 @@ interface WeddingData {
   bankAccount: string;
   bankHolder: string;
   qrisImage: string;
+  liveStreamUrl: string;
   bankAccounts: BankAccount[];
   story: StoryItem[];
 }
@@ -143,6 +144,7 @@ export default function KustomisasiPage() {
     bankAccount: "",
     bankHolder: "",
     qrisImage: "",
+    liveStreamUrl: "",
     bankAccounts: [],
     story: [],
   });
@@ -257,6 +259,7 @@ export default function KustomisasiPage() {
           bankAccount: weddingData.bankAccount || "",
           bankHolder: weddingData.bankHolder || "",
           qrisImage: weddingData.qrisImage || "",
+          liveStreamUrl: weddingData.liveStreamUrl || "",
           bankAccounts,
           story,
         });
@@ -852,6 +855,32 @@ export default function KustomisasiPage() {
               <Upload className="h-5 w-5" /> {uploading ? "Uploading..." : "Upload Musik Baru (MP3, max 10MB)"}
             </button>
             <input ref={musicInputRef} type="file" accept="audio/mpeg,audio/mp3" onChange={handleMusicInput} className="hidden" />
+          </div>
+
+          {/* Live Streaming */}
+          <div className="card-custom">
+            <h2 className="mb-4 flex items-center gap-2 font-semibold"><Video className="h-5 w-5 text-primary" /> Live Streaming</h2>
+            <p className="mb-4 text-sm text-muted-foreground">
+              Tambahkan link live streaming YouTube, Zoom, atau Google Meet agar tamu bisa menyaksikan secara virtual.
+            </p>
+            <div>
+              <label className="mb-1.5 block text-sm font-medium">URL Live Streaming</label>
+              <input
+                type="url"
+                value={weddingData.liveStreamUrl}
+                onChange={(e) => setWeddingData({ ...weddingData, liveStreamUrl: e.target.value })}
+                className="input-custom"
+                placeholder="https://youtube.com/watch?v=... atau https://zoom.us/j/..."
+              />
+              <p className="mt-1 text-xs text-muted-foreground">
+                Kosongkan jika tidak menggunakan live streaming.
+              </p>
+            </div>
+            <div className="mt-6 flex justify-end">
+              <button onClick={handleSave} disabled={saving} className="btn-primary">
+                <Save className="h-4 w-4" /> {saving ? "Menyimpan..." : "Simpan Perubahan"}
+              </button>
+            </div>
           </div>
         </div>
       )}

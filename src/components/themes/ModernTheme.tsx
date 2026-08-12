@@ -1,11 +1,12 @@
 "use client";
 
-import { useEffect, useRef } from "react";
 import Image from "next/image";
 import { motion, useScroll, useTransform } from "framer-motion";
 import type { Variants } from "framer-motion";
 import { Calendar, MapPin, Clock } from "lucide-react";
 import CountdownTimer from "@/components/CountdownTimer";
+import MusicToggle from "@/components/MusicToggle";
+import LiveStreamSection from "@/components/LiveStreamSection";
 import { themeArray, type BankAccount, type WeddingData } from "./types";
 
 const slideUp: Variants = {
@@ -44,18 +45,10 @@ export default function ModernTheme({ wedding }: { wedding: WeddingData }) {
     !!wedding.location && !wedding.akadVenue && !wedding.resepsiVenue;
   const { scrollY } = useScroll();
   const yParallax = useTransform(scrollY, [0, 600], [0, -150]);
-  const audioRef = useRef<HTMLAudioElement>(null);
-
-  useEffect(() => {
-    if (wedding.musicUrl && audioRef.current) {
-      audioRef.current.play().catch(() => {
-        // Autoplay blocked, user needs to interact first
-      });
-    }
-  }, [wedding.musicUrl]);
 
   return (
     <div className="overflow-hidden rounded-2xl bg-white shadow-xl" style={{ fontFamily: "system-ui, sans-serif" }}>
+      <MusicToggle musicUrl={wedding.musicUrl} />
       {/* Cover dengan Parallax Effect */}
       <motion.div style={{ y: yParallax }} className="relative aspect-[3/4] overflow-hidden">
         <Image
@@ -328,12 +321,8 @@ export default function ModernTheme({ wedding }: { wedding: WeddingData }) {
         </motion.div>
       )}
 
-      {/* Musik Background - Autoplay Hidden */}
-      {wedding.musicUrl && (
-        <div className="hidden">
-          <audio ref={audioRef} src={wedding.musicUrl} autoPlay loop />
-        </div>
-      )}
+      {/* Live Streaming */}
+      <LiveStreamSection liveStreamUrl={wedding.liveStreamUrl} />
 
       {/* Pesan */}
       {wedding.message && (

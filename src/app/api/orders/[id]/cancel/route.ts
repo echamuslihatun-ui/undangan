@@ -12,18 +12,19 @@ export const dynamic = "force-dynamic";
  * terikat pada order_id tertentu dan tidak bisa dipakai untuk channel lain,
  * jadi order lama dibatalkan lalu user membuat pesanan baru.
  */
-export async function POST(_req: Request, { params }: { params: { id: string } }) {
+export async function POST(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     const session = await getServerSession(authOptions);
     if (!session) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
+    const { id } = await params;
     const userId = session.user.id;
 
     // Pastikan order milik user yang login sebelum diubah.
     const order = await prisma.order.findFirst({
-      where: { id: params.id, userId },
+      where: { id, userId },
     });
 
     if (!order) {
