@@ -294,26 +294,13 @@ export default function KustomisasiPage() {
     { id: "amplop", label: "Amplop Digital", icon: QrCode },
   ];
 
-  const handleSelectTemplate = async (template: Template) => {
-    const updated = { ...weddingData, themeKey: template.themeKey };
-    setWeddingData(updated);
-    // Simpan pilihan template langsung agar tersimpan tanpa perlu klik Simpan di tab lain
-    try {
-      const res = await fetch("/api/wedding", {
-        method: "PUT",
-        credentials: "same-origin",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(updated),
-      });
-      if (res.ok) {
-        showToast("success", `Template "${template.name}" dipilih & disimpan!`);
-      } else {
-        showToast("error", `Template "${template.name}" dipilih, tapi gagal disimpan. Klik Simpan.`);
-      }
-    } catch (error) {
-      console.error("Save template error:", error);
-      showToast("error", `Template "${template.name}" dipilih, tapi gagal disimpan. Klik Simpan.`);
-    }
+  const handleSelectTemplate = (template: Template) => {
+    // Update state lokal dulu — jangan langsung simpan ke API.
+    // Untuk pelanggan baru, partner1/partner2 masih kosong sehingga API
+    // akan menolak dengan error "Nama kedua mempelai wajib diisi".
+    // Data akan disimpan nanti saat user klik "Simpan Perubahan" di tab Data Acara.
+    setWeddingData((prev) => ({ ...prev, themeKey: template.themeKey }));
+    showToast("success", `Template "${template.name}" dipilih! Klik Simpan di tab Data Acara untuk menyimpan.`);
     setActiveTab("acara");
   };
 
