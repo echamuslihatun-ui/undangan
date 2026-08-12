@@ -161,18 +161,15 @@ export default function KustomisasiPage() {
 
   useEffect(() => {
     async function fetchData() {
+      // Fetch templates TERPISAH dari wedding agar error wedding tidak
+      // mempengaruhi tampilan template. Sebelumnya keduanya digabung dalam
+      // Promise.all, sehingga jika wedding fetch gagal (401/500), template
+      // tidak pernah di-set dan halaman tampil kosong.
       try {
-        const [weddingRes, templatesRes] = await Promise.all([
-          fetch("/api/wedding", { credentials: "same-origin" }),
-          fetch("/api/templates", { credentials: "same-origin", cache: "no-store" }),
-
-        ]);
-
-        if (!weddingRes.ok) {
-          const err = await weddingRes.json().catch(() => null);
-          console.error("Wedding fetch failed:", weddingRes.status, err);
-          throw new Error(err?.error || "Gagal mengambil data acara");
-        }
+        const templatesRes = await fetch("/api/templates", {
+          credentials: "same-origin",
+          cache: "no-store",
+        });
 
         if (!templatesRes.ok) {
           const err = await templatesRes.json().catch(() => null);
@@ -180,23 +177,39 @@ export default function KustomisasiPage() {
           throw new Error(err?.error || "Gagal mengambil template");
         }
 
-        // Set daftar template LEBIH DULU, sebelum memproses data wedding.
-        // Untuk pelanggan baru, `/api/wedding` mengembalikan null; pemrosesan
-        // data wedding di bawah bisa gagal, dan jika setTemplates ditaruh
-        // sesudahnya, daftar template tidak akan pernah tampil. Menaruhnya di
-        // sini memastikan template selalu muncul, baik data wedding ada maupun tidak.
         const templatesData = await templatesRes.json();
         setTemplates(
           Array.isArray(templatesData)
             ? templatesData.filter((t: Template) => t.status === "active")
             : []
         );
+      } catch (error) {
+        console.error("Failed to fetch templates:", error);
+        // Template gagal di-fetch, tapi kita tetap lanjut fetch wedding
+        // agar form tetap bisa diisi meski daftar template kosong.
+      }
+
+      // Fetch wedding data terpisah. Jika gagal, hanya log error tanpa
+      // menghentikan render — form tetap tampil dengan nilai default.
+      try {
+        const weddingRes = await fetch("/api/wedding", {
+          credentials: "same-origin",
+        });
+
+        if (!weddingRes.ok) {
+          const err = await weddingRes.json().catch(() => null);
+          console.error("Wedding fetch failed:", weddingRes.status, err);
+          // Jangan throw — biarkan form tampil dengan data default.
+          setLoading(false);
+          return;
+        }
 
         const weddingData = await weddingRes.json();
         // Pelanggan yang belum pernah menyimpan data pernikahan akan mendapat
         // `null` dari API. Dalam kasus ini, biarkan form memakai nilai default
         // (state awal) dan jangan memproses lebih lanjut agar tidak crash.
         if (!weddingData) {
+          setLoading(false);
           return;
         }
 
@@ -264,8 +277,7 @@ export default function KustomisasiPage() {
           story,
         });
       } catch (error) {
-
-        console.error("Failed to fetch data:", error);
+        console.error("Failed to fetch wedding data:", error);
       } finally {
         setLoading(false);
       }
